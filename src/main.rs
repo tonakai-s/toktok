@@ -1,6 +1,6 @@
 use jiff::{SignedDuration, civil::DateTime};
 use reqwest::StatusCode;
-use toktok::scheduler::{ApplicationType, Scheduler, Task, TaskStatus, WebApplicationType};
+use toktok::{scheduler::Scheduler, task::{ApplicationType, Task, TaskStatus, WebApplicationType}};
 
 #[tokio::main]
 async fn main() {
@@ -12,7 +12,8 @@ async fn main() {
         StatusCode::from_u16(200).unwrap(),
     );
     let task = Task::new(
-        SignedDuration::from_secs(0),
+        SignedDuration::from_secs(10),
+        SignedDuration::from_secs(10),
         DateTime::default(),
         ApplicationType::Web(application),
         TaskStatus::Waiting,

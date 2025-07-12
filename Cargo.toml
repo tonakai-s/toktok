@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+anyhow = "1.0.98"
+config = "0.15.13"
 jiff = "0.2.15"
 reqwest = "0.12.22"
 tokio = { version = "1.46.1", features = ["rt-multi-thread", "macros"] }

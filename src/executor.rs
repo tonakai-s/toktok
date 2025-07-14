@@ -19,7 +19,7 @@ pub async fn web_execute(data: &WebData) {
             }
         }
         Err(err) => {
-            println!("Service unavailable with error {}", err);
+            println!("Service unavailable with error {err}");
             // bail!(err)
         }
     }

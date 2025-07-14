@@ -1,25 +1,16 @@
-use jiff::SignedDuration;
-use reqwest::StatusCode;
-use toktok::{
-    data::{Data, WebData},
-    scheduler::Scheduler,
-    task::Task,
-};
+use std::process::exit;
+
+use toktok::configuration::load_config;
 
 #[tokio::main]
 async fn main() {
-    let mut scheduler = Scheduler::new();
-
-    let data = Data::Web(WebData::new(
-        String::from("https://tuamaeaquelaursa.com"),
-        None,
-        StatusCode::from_u16(200).unwrap(),
-    ));
-    let task = Task::new(
-        String::from("site.tuamaeaquelaursa10secs"),
-        SignedDuration::from_secs(10),
-    );
-    scheduler.enqueue(task, data);
+    let scheduler = match load_config() {
+        Ok(s) => s,
+        Err(err) => {
+            println!("{err}");
+            exit(1)
+        }
+    };
 
     scheduler.start().await
 }

@@ -1,0 +1,12 @@
+notification:
+  email:
+    to: 'sample@fake.com'
+
+services:
+  site.tuamaeaquelaursa10secs:
+    interval: 5
+    timeout: 10
+    config:
+      type: Web
+      domain: 'https://tuamaeaquelaursa.com'
+      expected_http_code: 200

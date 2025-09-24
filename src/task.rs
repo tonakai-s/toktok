@@ -4,7 +4,7 @@ use crate::{
     checker::Checker,
     executor::ExecutionResult,
     notification::{Notifier, NotifierContent},
-    task_info::TaskInfo,
+    task_info::TaskInfo, task_logger::TaskLogger,
 };
 
 #[derive(Debug)]
@@ -12,6 +12,7 @@ pub struct Task {
     info: TaskInfo,
     checker: Checker,
     notifier: Notifier,
+    logger: TaskLogger
 }
 
 impl Task {
@@ -20,10 +21,15 @@ impl Task {
     }
 
     pub fn new(info: TaskInfo, checker: Checker, notifier: Notifier) -> Self {
+        let logger = match TaskLogger::new(info.name.clone(), None) {
+            Ok(tl) => tl,
+            Err(err) => panic!("{}", err)
+        };
         Self {
             info,
             checker,
             notifier,
+            logger
         }
     }
 
@@ -39,6 +45,11 @@ impl Task {
     pub fn checker(&self) -> &Checker {
         &self.checker
     }
+
+    pub fn log(&mut self, exec_result: ExecutionResult) {
+        self.logger.log(exec_result);
+    }
+
     pub fn notify(&self, exec_resp: ExecutionResult) {
         let content = NotifierContent::new(
             self.info.last_execution_at,

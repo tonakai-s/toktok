@@ -34,7 +34,7 @@ pub async fn execute(mut task: Task, tx: Sender<Task>) {
     let checker_result = match task.checker() {
         Checker::Web(web_data) => web_execute(&web_data).await,
     };
-    task.notify(checker_result);
+    task.log(checker_result);
     let _ = tx.send(task);
 }
 

@@ -1,12 +1,19 @@
-use crate::data::{Data, WebData};
+use std::sync::mpsc::Sender;
 
-pub async fn execute(data: &Data) {
-    match data {
-        Data::Web(web_data) => web_execute(web_data).await,
+use crate::{
+    checker::{Checker, WebChecker},
+    task::Task,
+};
+
+pub async fn execute(mut task: Task, tx: Sender<Task>) {
+    task.set_last_execution_at();
+    match task.checker() {
+        Checker::Web(web_data) => web_execute(&web_data).await,
     }
+    let _ = tx.send(task);
 }
 
-pub async fn web_execute(data: &WebData) {
+pub async fn web_execute(data: &WebChecker) {
     let response = reqwest::get(data.url()).await;
     match response {
         std::result::Result::Ok(response) => {

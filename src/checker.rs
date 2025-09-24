@@ -2,13 +2,13 @@ use anyhow::bail;
 use reqwest::StatusCode;
 use yaml_rust2::{Yaml, yaml::Hash};
 
-#[derive(Debug, Clone)]
-pub enum Data {
-    Web(WebData),
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Checker {
+    Web(WebChecker),
 }
 
-#[derive(Debug, Clone)]
-pub struct WebData {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WebChecker {
     domain: String,
     #[allow(dead_code)]
     path: Option<String>,
@@ -16,7 +16,7 @@ pub struct WebData {
     expected_code: StatusCode,
 }
 
-impl TryFrom<&Hash> for Data {
+impl TryFrom<&Hash> for Checker {
     type Error = anyhow::Error;
 
     fn try_from(data_config: &Hash) -> Result<Self, Self::Error> {
@@ -53,14 +53,14 @@ impl TryFrom<&Hash> for Data {
                     Ok(code) => code,
                     Err(_) => bail!("'expected_http_code' must be a valid HTTP code"),
                 };
-                Ok(Data::Web(WebData::new(domain, path, http_code)))
+                Ok(Checker::Web(WebChecker::new(domain, path, http_code)))
             }
             _ => bail!("Type '{}' is not valid", service_type),
         }
     }
 }
 
-impl WebData {
+impl WebChecker {
     pub fn new(domain: String, path: Option<String>, expected_code: StatusCode) -> Self {
         let url = path.as_ref().map(|path| format!("{domain}{path}"));
         Self {

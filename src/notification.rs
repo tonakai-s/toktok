@@ -33,11 +33,7 @@ pub struct FileNotifier {
 }
 
 impl FileNotifier {
-    pub fn new(
-        file: FileNotify,
-        service_type: ServiceType,
-        service_name: String,
-    ) -> Self {
+    pub fn new(file: FileNotify, service_type: ServiceType, service_name: String) -> Self {
         Self {
             file,
             service_type,

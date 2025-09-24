@@ -1,13 +1,15 @@
 use std::{
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, mpsc::channel},
     thread,
     time::Duration,
 };
 
-use crate::{data::Data, executor::execute, task::Task};
+use jiff::Zoned;
+
+use crate::{executor, queue::PriorityQueue, task::Task};
 
 pub struct Scheduler {
-    tasks: Vec<Arc<Mutex<(Task, Data)>>>,
+    tasks: Arc<Mutex<PriorityQueue>>,
 }
 impl Default for Scheduler {
     fn default() -> Self {
@@ -16,35 +18,45 @@ impl Default for Scheduler {
 }
 impl Scheduler {
     pub fn new() -> Self {
-        Self { tasks: vec![] }
+        Self {
+            tasks: Arc::new(Mutex::new(PriorityQueue::default())),
+        }
     }
-    pub fn enqueue(&mut self, task: Task, data: Data) {
-        self.tasks.push(Arc::new(Mutex::new((task, data))));
+    pub fn enqueue(&mut self, task: Task) {
+        self.tasks.lock().unwrap().enqueue(task);
     }
     pub async fn start(&self) {
-        let mut count = 0;
+        let (tx, rx) = channel::<Task>();
+        let task_queue = self.tasks.clone();
+        tokio::spawn(async move {
+            loop {
+                let mut task = rx.recv().unwrap();
+                task.set_next_execution_at();
+                task_queue.lock().unwrap().enqueue(task);
+            }
+        });
+
         loop {
             thread::sleep(Duration::from_secs(1));
+            {
+                let mut task_queue = self.tasks.lock().unwrap();
+                loop {
+                    if task_queue
+                        .peek()
+                        .is_none_or(|t| t.next_execution_at() > &Zoned::now().datetime())
+                    {
+                        break;
+                    }
 
-            for task in &self.tasks {
-                if !task.lock().unwrap().0.check_trigger() {
-                    continue;
+                    let task = task_queue.dequeue();
+                    dbg!(&task);
+                    let tx = tx.clone();
+                    tokio::spawn(async move {
+                        println!("--Lets spawn a task for '{}'!", task.name());
+                        executor::execute(task, tx).await;
+                    });
                 }
-
-                let c_task = task.clone();
-                println!(
-                    "--Lets spawn a task for '{}'!",
-                    c_task.lock().unwrap().0.name()
-                );
-                tokio::spawn(async move {
-                    let data = { c_task.lock().unwrap().1.clone() };
-                    execute(&data).await;
-                    c_task.lock().unwrap().0.default_reset();
-                });
             }
-
-            count += 1;
-            println!("-Elapsed seconds: {count}");
         }
     }
 }

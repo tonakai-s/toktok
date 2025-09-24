@@ -4,7 +4,7 @@ use anyhow::bail;
 use jiff::SignedDuration;
 use yaml_rust2::{Yaml, YamlLoader, yaml::Hash};
 
-use crate::{data::Data, scheduler::Scheduler, task::Task};
+use crate::{checker::Checker, scheduler::Scheduler, task::Task, task_info::TaskInfo};
 
 pub fn load_config() -> anyhow::Result<Scheduler> {
     let mut content = String::new();
@@ -53,10 +53,10 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Scheduler> {
             None => bail!("Provided service is not a valid map"),
         };
         let interval = interval(service_map)?;
-        let task = Task::new(service_name, interval);
-        let data = type_data(service_map)?;
+        let info = TaskInfo::new(service_name, interval);
+        let checker = type_data(service_map)?;
 
-        scheduler.enqueue(task, data);
+        scheduler.enqueue(Task::new(info, checker));
     }
 
     Ok(scheduler)
@@ -77,7 +77,7 @@ fn interval(service_attrs: &Hash) -> anyhow::Result<SignedDuration> {
         None => bail!("'interval' must be a number."),
     }
 }
-fn type_data(service_attrs: &Hash) -> anyhow::Result<Data> {
+fn type_data(service_attrs: &Hash) -> anyhow::Result<Checker> {
     let service_config = match service_attrs.get(&Yaml::String("config".into())) {
         Some(config) => config,
         None => bail!("'config' is mandatory map field for a service."),
@@ -87,5 +87,5 @@ fn type_data(service_attrs: &Hash) -> anyhow::Result<Data> {
         None => bail!("'config' is not valid map."),
     };
 
-    Data::try_from(config_map)
+    Checker::try_from(config_map)
 }

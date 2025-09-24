@@ -43,7 +43,7 @@ impl Scheduler {
                 loop {
                     if task_queue
                         .peek()
-                        .is_none_or(|t| t.next_execution_at() > &Zoned::now().datetime())
+                        .is_none_or(|t| t.0.next_execution_at() > &Zoned::now().datetime())
                     {
                         break;
                     }

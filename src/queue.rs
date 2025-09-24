@@ -1,9 +1,9 @@
-use std::collections::BinaryHeap;
+use std::{collections::BinaryHeap, cmp::Reverse};
 
 use crate::task::Task;
 
 pub struct PriorityQueue {
-    heap: BinaryHeap<Task>,
+    heap: BinaryHeap<Reverse<Task>>,
 }
 
 impl PriorityQueue {
@@ -14,14 +14,14 @@ impl PriorityQueue {
     }
 
     pub fn dequeue(&mut self) -> Task {
-        self.heap.pop().unwrap()
+        self.heap.pop().unwrap().0
     }
 
     pub fn enqueue(&mut self, item: Task) {
-        self.heap.push(item);
+        self.heap.push(Reverse(item));
     }
 
-    pub fn peek(&self) -> Option<&Task> {
+    pub fn peek(&self) -> Option<&Reverse<Task>> {
         self.heap.peek()
     }
 }

@@ -1,7 +1,11 @@
-use std::{fs::{self, File}, io::Write, path::{Path, PathBuf}};
+use std::{
+    fs::{self, File},
+    io::Write,
+    path::{Path, PathBuf},
+};
 
-use anyhow::{bail, Result};
-use jiff::{civil::Date, Zoned};
+use anyhow::{Result, bail};
+use jiff::{Zoned, civil::Date};
 
 use crate::executor::ExecutionResult;
 
@@ -10,7 +14,7 @@ pub struct TaskLogger {
     filename: String,
     file_dir: PathBuf,
     file_date: Date,
-    file: File
+    file: File,
 }
 
 impl TaskLogger {
@@ -25,21 +29,24 @@ impl TaskLogger {
         if !log_path.exists() {
             match fs::create_dir_all(&log_path) {
                 Ok(_) => (),
-                Err(err) => bail!("The program was unable to create the logs directory. Error: {}", err),
+                Err(err) => bail!(
+                    "The program was unable to create the logs directory. Error: {}",
+                    err
+                ),
             }
         }
 
-        let full_log_filepath = format!(
-            "{}{}",
-            log_dir,
-            filename
-        );
+        let full_log_filepath = format!("{}{}", log_dir, filename);
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists() {
             let _ = fs::File::create(&full_log_filepath);
         }
 
-        let file = fs::OpenOptions::new().write(true).append(true).open(&full_log_filepath).unwrap();
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&full_log_filepath)
+            .unwrap();
         Ok(Self {
             filename,
             file_dir: log_path,
@@ -69,7 +76,6 @@ impl TaskLogger {
             Zoned::now().datetime().to_string(),
             execution_result.status,
             execution_result.message,
-            
         );
         let _ = self.file.write_all(content.as_bytes());
     }

@@ -1,4 +1,4 @@
-use std::{collections::BinaryHeap, cmp::Reverse};
+use std::{cmp::Reverse, collections::BinaryHeap};
 
 use crate::task::Task;
 

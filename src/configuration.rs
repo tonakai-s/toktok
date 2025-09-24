@@ -4,17 +4,19 @@ use anyhow::bail;
 use jiff::SignedDuration;
 use yaml_rust2::{Yaml, YamlLoader, yaml::Hash};
 
-use crate::{checker::Checker, scheduler::Scheduler, task::Task, task_info::TaskInfo};
+use crate::{
+    checker::Checker, notification::Notifier, scheduler::Scheduler, task::Task, task_info::TaskInfo,
+};
 
 pub fn load_config() -> anyhow::Result<Scheduler> {
     let mut content = String::new();
     let mut file = match std::fs::File::open("services.yaml") {
         Ok(f) => f,
-        Err(err) => bail!("Error trying to open the config file: {:?}", err),
+        Err(err) => bail!("Error trying to open the config file: {:#?}", err),
     };
     match file.read_to_string(&mut content) {
         Ok(_) => {}
-        Err(err) => bail!("Error trying to read the config file: {:?}", err),
+        Err(err) => bail!("Error trying to read the config file: {:#?}", err),
     };
     let mut config = match YamlLoader::load_from_str(&content) {
         Ok(c) => c,
@@ -55,8 +57,9 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Scheduler> {
         let interval = interval(service_map)?;
         let info = TaskInfo::new(service_name, interval);
         let checker = type_data(service_map)?;
+        let notifier = notification(service_map)?;
 
-        scheduler.enqueue(Task::new(info, checker));
+        scheduler.enqueue(Task::new(info, checker, notifier));
     }
 
     Ok(scheduler)
@@ -78,14 +81,26 @@ fn interval(service_attrs: &Hash) -> anyhow::Result<SignedDuration> {
     }
 }
 fn type_data(service_attrs: &Hash) -> anyhow::Result<Checker> {
-    let service_config = match service_attrs.get(&Yaml::String("config".into())) {
+    let service_config = match service_attrs.get(&Yaml::String("configuration".into())) {
         Some(config) => config,
-        None => bail!("'config' is mandatory map field for a service."),
+        None => bail!("'configuration' is mandatory map field for a service."),
     };
     let config_map = match service_config.as_hash() {
         Some(map) => map,
-        None => bail!("'config' is not valid map."),
+        None => bail!("'configuration' is not valid map."),
     };
 
     Checker::try_from(config_map)
+}
+fn notification(service_attrs: &Hash) -> anyhow::Result<Notifier> {
+    let service_notification = match service_attrs.get(&Yaml::String("notification".into())) {
+        Some(notification) => notification,
+        None => bail!("'notification' is mandatory map field for a service."),
+    };
+    let notification_map = match service_notification.as_hash() {
+        Some(map) => map,
+        None => bail!("'notification' is not valid map."),
+    };
+
+    Notifier::try_from(notification_map)
 }

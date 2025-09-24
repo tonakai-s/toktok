@@ -1,12 +1,13 @@
-# TODO: Create a global notification config, so config in every service is not required
+# TODO Create a global notification config, so config in every service is not required
 services:
   site.tuamaeaquelaursa10secs:
     interval: 5
     timeout: 10
-    config:
+    configuration:
       type: Web
       domain: 'https://tuamaeaquelaursa.com'
       expected_http_code: 200
     notification:
-      type: File,
+      type: file
       directory: /tmp/toktok/tuamaeaquelaursa
+      # TODO content_type: text

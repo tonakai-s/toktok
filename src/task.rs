@@ -1,11 +1,17 @@
 use jiff::{Zoned, civil::DateTime};
 
-use crate::{checker::Checker, task_info::TaskInfo};
+use crate::{
+    checker::Checker,
+    executor::ExecutionResult,
+    notification::{Notifier, NotifierContent},
+    task_info::TaskInfo,
+};
 
 #[derive(Debug)]
 pub struct Task {
     info: TaskInfo,
     checker: Checker,
+    notifier: Notifier,
 }
 
 impl Task {
@@ -13,8 +19,12 @@ impl Task {
         self.info.name.clone().to_string()
     }
 
-    pub fn new(info: TaskInfo, checker: Checker) -> Self {
-        Self { info, checker }
+    pub fn new(info: TaskInfo, checker: Checker, notifier: Notifier) -> Self {
+        Self {
+            info,
+            checker,
+            notifier,
+        }
     }
 
     pub fn set_last_execution_at(&mut self) {
@@ -28,6 +38,20 @@ impl Task {
     }
     pub fn checker(&self) -> &Checker {
         &self.checker
+    }
+    pub fn notify(&self, exec_resp: ExecutionResult) {
+        let content = NotifierContent::new(
+            self.info.last_execution_at,
+            Zoned::now().datetime(),
+            exec_resp,
+        );
+
+        match &self.notifier {
+            Notifier::File(notifier) => match notifier.write(content) {
+                Ok(_) => (),
+                Err(_) => (),
+            },
+        };
     }
 }
 

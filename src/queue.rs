@@ -2,6 +2,7 @@ use std::{cmp::Reverse, collections::BinaryHeap};
 
 use crate::task::Task;
 
+#[derive(Debug)]
 pub struct PriorityQueue {
     heap: BinaryHeap<Reverse<Task>>,
 }

@@ -1,11 +1,10 @@
 use std::{fs, io::Read, path::PathBuf};
 
-use anyhow::bail;
+use anyhow::{bail, Result};
 use lettre::{
-    Message, SmtpTransport, Transport,
-    message::{Mailbox, header::ContentType},
-    transport::smtp::authentication::Credentials,
+    message::{header::ContentType, Mailbox}, transport::smtp::authentication::Credentials, Address, Message, SmtpTransport, Transport
 };
+use tracing::{event, span, Level};
 use yaml_rust2::{Yaml, yaml::Hash};
 
 use crate::{executor::ExecutionResult, notification::Notifier};
@@ -19,27 +18,39 @@ pub struct MailNotifier {
     _bcc: Option<String>,
 }
 impl MailNotifier {
-    fn new(user: String, pass: String, domain: String, from: String, to: String) -> Self {
+    fn new(user: String, pass: String, domain: String, from: String, to: String) -> Result<Self> {
         let creds = Credentials::new(user, pass);
         let mailer = SmtpTransport::relay(&domain)
             .unwrap()
             .credentials(creds)
             .build();
 
-        let from = Mailbox::new(None, from.parse().unwrap());
-        let to = Mailbox::new(None, to.parse().unwrap());
-        Self {
+        let from_address = match from.parse::<Address>() {
+            Ok(addr) => addr,
+            Err(err) => bail!("Error parsing the 'from' mail address, double check it: {}", err)
+        };
+        let to_address = match to.parse::<Address>() {
+            Ok(addr) => addr,
+            Err(err) => bail!("Error parsing the 'to' mail address, double check it: {}", err)
+        };
+        let from = Mailbox::new(None, from_address);
+        let to = Mailbox::new(None, to_address);
+
+        Ok(Self {
             mailer,
             from,
             to,
             _cc: None,
             _bcc: None,
-        }
+        })
     }
 }
 
 impl Notifier for MailNotifier {
     fn notify(&self, exec_result: &ExecutionResult) {
+        let span = span!(Level::TRACE, "MailNotifier::notify");
+        let _enter = span.enter();
+
         let body = format!(
             "Hello, the service {} reported with status '{}' in the last verification: {}",
             exec_result.service_name, exec_result.status, exec_result.message
@@ -53,8 +64,15 @@ impl Notifier for MailNotifier {
             .unwrap();
 
         match self.mailer.send(&email) {
-            Ok(_) => println!("Email sent successfully!"),
-            Err(err) => println!("Error sending the email: {:#?}", err),
+            Ok(_) => event!(
+                Level::TRACE,
+                "Email notification sent successfully"
+            ),
+            Err(err) => event!(
+                Level::ERROR,
+                error = %err,
+                "Error sending the Email notification"
+            ),
         };
     }
 }
@@ -102,13 +120,13 @@ impl TryFrom<&Hash> for MailNotifier {
         if let Some(username) = buff_iter.next()
             && let Some(password) = buff_iter.next()
         {
-            return Ok(MailNotifier::new(
+            return MailNotifier::new(
                 username.into(),
                 password.into(),
                 smtp_domain.into(),
                 from.into(),
                 to.into(),
-            ));
+            );
         } else {
             bail!(
                 "Mailer credentials username and password cannot be empty.\nExpected file format: fist line = username, second line = password"

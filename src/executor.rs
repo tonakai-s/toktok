@@ -1,5 +1,7 @@
 use std::{fmt::Display, sync::mpsc::Sender};
 
+use tracing::{Level, event};
+
 use crate::{
     checker::{Checker, WebChecker},
     task::Task,
@@ -43,9 +45,23 @@ pub async fn execute(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<
     };
     task.log(&checker_result);
     if checker_result.status != ExecutionStatus::Success {
-        let _ = tx_notifier.send(checker_result);
+        if let Err(err) = tx_notifier.send(checker_result) {
+            event!(
+                Level::ERROR,
+                message = ?err.0,
+                error = %err,
+                "Error sending the checker result to notifier thread"
+            );
+        }
     }
-    let _ = tx_task.send(task);
+    if let Err(err) = tx_task.send(task) {
+        event!(
+            Level::ERROR,
+            message = ?err.0,
+            error = %err,
+            "Error sending task to the enqueuer thread"
+        );
+    }
 }
 
 pub async fn web_execute(service: &str, data: &WebChecker) -> ExecutionResult {
@@ -69,7 +85,7 @@ pub async fn web_execute(service: &str, data: &WebChecker) -> ExecutionResult {
         Err(err) => ExecutionResult::new(
             service.to_string(),
             ExecutionStatus::Error,
-            format!("Service unavailable with error {err}"),
+            format!("Service unavailable: {err}"),
         ),
     }
 }

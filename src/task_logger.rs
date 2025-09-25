@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::{Result, bail};
 use jiff::{Zoned, civil::Date};
+use tracing::{Level, event, span};
 
 use crate::executor::ExecutionResult;
 
@@ -19,6 +20,9 @@ pub struct TaskLogger {
 
 impl TaskLogger {
     pub fn new(filename: String, dir: Option<&str>) -> Result<Self> {
+        let span = span!(Level::TRACE, "task_logger::new");
+        let _enter = span.enter();
+
         let filename = TaskLogger::todays_filename(&filename);
         let mut log_dir = "/tmp/toktok/";
         if let Some(dir) = dir {
@@ -39,14 +43,27 @@ impl TaskLogger {
         let full_log_filepath = format!("{}{}", log_dir, filename);
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists() {
-            let _ = fs::File::create(&full_log_filepath);
+            if let Err(err) = fs::File::create(&full_log_filepath) {
+                bail!(
+                    "The program was unable to create the logs file. Error: {}",
+                    err
+                );
+            }
         }
 
-        let file = fs::OpenOptions::new()
+        let file = match fs::OpenOptions::new()
             .write(true)
             .append(true)
             .open(&full_log_filepath)
-            .unwrap();
+        {
+            Ok(file) => file,
+            Err(err) => {
+                bail!(
+                    "The program was unable to open the logs file. Error: {}",
+                    err
+                );
+            }
+        };
         Ok(Self {
             filename,
             file_dir: log_path,
@@ -67,6 +84,9 @@ impl TaskLogger {
     }
 
     pub fn log(&mut self, execution_result: &ExecutionResult) {
+        let span = span!(Level::TRACE, "task_logger::log");
+        let _enter = span.enter();
+
         if self.file_date != Zoned::now().date() {
             self.update_file();
         }
@@ -77,10 +97,19 @@ impl TaskLogger {
             execution_result.status,
             execution_result.message,
         );
-        let _ = self.file.write_all(content.as_bytes());
+        if let Err(err) = self.file.write_all(content.as_bytes()) {
+            event!(
+                Level::ERROR,
+                error = %err,
+                "Error writing the task result to general log"
+            );
+        }
     }
 
     fn update_file(&mut self) {
+        let span = span!(Level::TRACE, "task_logger::update_file");
+        let _enter = span.enter();
+
         let full_log_filepath = format!(
             "{}/{}",
             self.file_dir.to_str().unwrap(),
@@ -88,10 +117,32 @@ impl TaskLogger {
         );
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists() {
-            let _ = fs::File::create(&full_log_filepath);
+            if let Err(err) = fs::File::create(&full_log_filepath) {
+                event!(
+                    Level::ERROR,
+                    error = %err,
+                    "Error updating the general task log file"
+                );
+                panic!(
+                    "Error updating the general task log file. For more info check the tracing file."
+                );
+            }
         }
 
-        let file = fs::File::open(&full_log_filepath).unwrap();
+        let file = match fs::File::open(&full_log_filepath) {
+            Ok(file) => file,
+            Err(err) => {
+                event!(
+                    Level::ERROR,
+                    error = %err,
+                    "Error opening the general task log file"
+                );
+                panic!(
+                    "Error opening the general task log file. For more info check the tracing file."
+                );
+            }
+        };
+
         self.file = file;
     }
 }

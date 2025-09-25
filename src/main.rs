@@ -4,11 +4,13 @@ use toktok::{configuration::load_config, scheduler::Scheduler};
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt::init();
+
     let config = match load_config() {
         Ok(s) => s,
         Err(err) => {
             eprintln!("{err}");
-            exit(1)
+            exit(1);
         }
     };
     if config.tasks.is_empty() {

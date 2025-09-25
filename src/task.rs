@@ -12,10 +12,6 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn name(&self) -> String {
-        self.info.name.clone().to_string()
-    }
-
     pub fn new(info: TaskInfo, checker: Checker) -> Self {
         let logger = match TaskLogger::new(info.name.clone(), None) {
             Ok(tl) => tl,
@@ -28,15 +24,22 @@ impl Task {
         }
     }
 
+    pub fn name(&self) -> String {
+        self.info.name.clone().to_string()
+    }
+
     pub fn set_last_execution_at(&mut self) {
         self.info.last_execution_at = Zoned::now().datetime();
     }
+
     pub fn set_next_execution_at(&mut self) {
         self.info.next_execution_at = Zoned::now().datetime() + self.info.interval;
     }
+
     pub fn next_execution_at(&self) -> &DateTime {
         &self.info.next_execution_at
     }
+
     pub fn checker(&self) -> &Checker {
         &self.checker
     }

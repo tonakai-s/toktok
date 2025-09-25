@@ -5,6 +5,7 @@ use std::{
 };
 
 use jiff::Zoned;
+use tracing::{Level, event};
 
 use crate::{
     configuration::Configuration,
@@ -14,6 +15,7 @@ use crate::{
     task::Task,
 };
 
+#[derive(Debug)]
 pub struct Scheduler {
     tasks: Arc<Mutex<PriorityQueue>>,
 }
@@ -32,10 +34,20 @@ impl Scheduler {
     }
 
     pub async fn start(&self, notifiers: Vec<impl Notifier + Send + 'static>) {
+        event!(
+            Level::INFO,
+            notifiers_count = notifiers.len(),
+            "Scheduler has been initiated"
+        );
+
         let (tx_task, rx_task) = channel::<Task>();
         let (tx_notifier, rx_notifier) = channel::<ExecutionResult>();
         let task_queue = self.tasks.clone();
         tokio::spawn(async move {
+            event!(
+                Level::INFO,
+                "Task update and enqueuer thread has been initiated"
+            );
             loop {
                 let mut task = rx_task.recv().unwrap();
                 task.set_next_execution_at();
@@ -44,15 +56,16 @@ impl Scheduler {
         });
 
         tokio::spawn(async move {
+            event!(Level::INFO, "Notifiers thread has been initiated");
             loop {
                 let execution_result = rx_notifier.recv().unwrap();
-                println!("Notifiers size: {}", notifiers.len());
                 for notifier in &notifiers {
                     notifier.notify(&execution_result);
                 }
             }
         });
 
+        event!(Level::INFO, "Initiating the main task loop");
         loop {
             thread::sleep(Duration::from_secs(1));
             {
@@ -66,11 +79,9 @@ impl Scheduler {
                     }
 
                     let task = task_queue.dequeue();
-                    dbg!(&task);
                     let tx_task = tx_task.clone();
                     let tx_notifier = tx_notifier.clone();
                     tokio::spawn(async move {
-                        println!("--Lets spawn a task for '{}'!", task.name());
                         executor::execute(task, tx_task, tx_notifier).await;
                     });
                 }

@@ -3,7 +3,7 @@ use std::{fmt::Display, sync::mpsc::Sender};
 use tracing::{Level, event};
 
 use crate::{
-    checker::{Checker, WebChecker},
+    checker::{WebChecker, Checker},
     task::Task,
 };
 

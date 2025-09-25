@@ -6,33 +6,50 @@ use std::{
 
 use jiff::Zoned;
 
-use crate::{executor, queue::PriorityQueue, task::Task};
+use crate::{
+    configuration::Configuration,
+    executor::{self, ExecutionResult},
+    notification::Notifier,
+    queue::PriorityQueue,
+    task::Task,
+};
 
 pub struct Scheduler {
     tasks: Arc<Mutex<PriorityQueue>>,
 }
-impl Default for Scheduler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+
 impl Scheduler {
-    pub fn new() -> Self {
-        Self {
-            tasks: Arc::new(Mutex::new(PriorityQueue::default())),
+    pub fn new(config: Configuration) -> Self {
+        let queue = Arc::new(Mutex::new(PriorityQueue::default()));
+        {
+            let mut lock = queue.lock().unwrap();
+            for task in config.tasks {
+                lock.enqueue(task);
+            }
         }
+
+        Self { tasks: queue }
     }
-    pub fn enqueue(&mut self, task: Task) {
-        self.tasks.lock().unwrap().enqueue(task);
-    }
-    pub async fn start(&self) {
-        let (tx, rx) = channel::<Task>();
+
+    pub async fn start(&self, notifiers: Vec<impl Notifier + Send + 'static>) {
+        let (tx_task, rx_task) = channel::<Task>();
+        let (tx_notifier, rx_notifier) = channel::<ExecutionResult>();
         let task_queue = self.tasks.clone();
         tokio::spawn(async move {
             loop {
-                let mut task = rx.recv().unwrap();
+                let mut task = rx_task.recv().unwrap();
                 task.set_next_execution_at();
                 task_queue.lock().unwrap().enqueue(task);
+            }
+        });
+
+        tokio::spawn(async move {
+            loop {
+                let execution_result = rx_notifier.recv().unwrap();
+                println!("Notifiers size: {}", notifiers.len());
+                for notifier in &notifiers {
+                    notifier.notify(&execution_result);
+                }
             }
         });
 
@@ -50,10 +67,11 @@ impl Scheduler {
 
                     let task = task_queue.dequeue();
                     dbg!(&task);
-                    let tx = tx.clone();
+                    let tx_task = tx_task.clone();
+                    let tx_notifier = tx_notifier.clone();
                     tokio::spawn(async move {
                         println!("--Lets spawn a task for '{}'!", task.name());
-                        executor::execute(task, tx).await;
+                        executor::execute(task, tx_task, tx_notifier).await;
                     });
                 }
             }

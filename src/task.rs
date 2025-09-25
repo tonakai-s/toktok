@@ -1,18 +1,13 @@
 use jiff::{Zoned, civil::DateTime};
 
 use crate::{
-    checker::Checker,
-    executor::ExecutionResult,
-    notification::{Notifier, NotifierContent},
-    task_info::TaskInfo,
-    task_logger::TaskLogger,
+    checker::Checker, executor::ExecutionResult, task_info::TaskInfo, task_logger::TaskLogger,
 };
 
 #[derive(Debug)]
 pub struct Task {
     info: TaskInfo,
     checker: Checker,
-    notifier: Notifier,
     logger: TaskLogger,
 }
 
@@ -21,7 +16,7 @@ impl Task {
         self.info.name.clone().to_string()
     }
 
-    pub fn new(info: TaskInfo, checker: Checker, notifier: Notifier) -> Self {
+    pub fn new(info: TaskInfo, checker: Checker) -> Self {
         let logger = match TaskLogger::new(info.name.clone(), None) {
             Ok(tl) => tl,
             Err(err) => panic!("{}", err),
@@ -29,7 +24,6 @@ impl Task {
         Self {
             info,
             checker,
-            notifier,
             logger,
         }
     }
@@ -47,23 +41,8 @@ impl Task {
         &self.checker
     }
 
-    pub fn log(&mut self, exec_result: ExecutionResult) {
-        self.logger.log(exec_result);
-    }
-
-    pub fn notify(&self, exec_resp: ExecutionResult) {
-        let content = NotifierContent::new(
-            self.info.last_execution_at,
-            Zoned::now().datetime(),
-            exec_resp,
-        );
-
-        match &self.notifier {
-            Notifier::File(notifier) => match notifier.write(content) {
-                Ok(_) => (),
-                Err(_) => (),
-            },
-        };
+    pub fn log(&mut self, exec_result: &ExecutionResult) {
+        self.logger.log(&exec_result);
     }
 }
 

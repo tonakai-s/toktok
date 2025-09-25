@@ -4,13 +4,24 @@ use anyhow::bail;
 use jiff::SignedDuration;
 use yaml_rust2::{Yaml, YamlLoader, yaml::Hash};
 
-use crate::{
-    checker::Checker, notification::Notifier, scheduler::Scheduler, task::Task, task_info::TaskInfo,
-};
+use crate::{checker::Checker, notification::email::MailNotifier, task::Task, task_info::TaskInfo};
 
-pub fn load_config() -> anyhow::Result<Scheduler> {
+pub struct Configuration {
+    pub tasks: Vec<Task>,
+    pub mailer: Option<MailNotifier>,
+}
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            tasks: vec![],
+            mailer: None,
+        }
+    }
+}
+
+pub fn load_config() -> anyhow::Result<Configuration> {
     let mut content = String::new();
-    let mut file = match std::fs::File::open("services.yaml") {
+    let mut file = match std::fs::File::open("toktok.yaml") {
         Ok(f) => f,
         Err(err) => bail!("Error trying to open the config file: {:#?}", err),
     };
@@ -29,20 +40,44 @@ pub fn load_config() -> anyhow::Result<Scheduler> {
     parse_config(&mut config)
 }
 
-fn parse_config(config: &mut [Yaml]) -> anyhow::Result<Scheduler> {
-    let mut scheduler: Option<_> = None;
+fn parse_config(config: &mut [Yaml]) -> anyhow::Result<Configuration> {
+    let mut configuration = Configuration::default();
+
+    let config_hash = config[0].as_hash().unwrap();
+    if let Some(notification_section) = config_hash.get(&Yaml::String("notification".into())) {
+        parse_notifications(notification_section, &mut configuration)?;
+    }
+
     for section in config[0].as_hash().unwrap().iter() {
         if section.0.as_str().unwrap() == "services" {
-            scheduler = Some(parse_services(&section)?);
+            configuration.tasks = parse_services(&section)?;
         }
     }
 
-    // Have another way to do this, need look at hello-crate repo
-    Ok(scheduler.unwrap())
+    Ok(configuration)
 }
 
-fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Scheduler> {
-    let mut scheduler = Scheduler::default();
+fn parse_notifications(section: &Yaml, configuration: &mut Configuration) -> anyhow::Result<()> {
+    let section_hash = match section.as_hash() {
+        Some(hash) => hash,
+        None => bail!("The 'notification' is not a valid map"),
+    };
+
+    if let Some(mailer) = section_hash.get(&Yaml::String("mailer".into())) {
+        let mailer_hash = match mailer.as_hash() {
+            Some(hash) => hash,
+            None => bail!("The 'mailer' is not a valid map"),
+        };
+        let mailer = MailNotifier::try_from(mailer_hash)?;
+
+        configuration.mailer = Some(mailer);
+    }
+
+    Ok(())
+}
+
+fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Vec<Task>> {
+    let mut tasks: Vec<_> = vec![];
 
     let services_map = match section.1.as_hash() {
         Some(map) => map,
@@ -57,12 +92,11 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Scheduler> {
         let interval = interval(service_map)?;
         let info = TaskInfo::new(service_name, interval);
         let checker = type_data(service_map)?;
-        let notifier = notification(service_map)?;
 
-        scheduler.enqueue(Task::new(info, checker, notifier));
+        tasks.push(Task::new(info, checker));
     }
 
-    Ok(scheduler)
+    Ok(tasks)
 }
 fn interval(service_attrs: &Hash) -> anyhow::Result<SignedDuration> {
     let interval_value = match service_attrs.get(&Yaml::String("interval".into())) {
@@ -91,16 +125,4 @@ fn type_data(service_attrs: &Hash) -> anyhow::Result<Checker> {
     };
 
     Checker::try_from(config_map)
-}
-fn notification(service_attrs: &Hash) -> anyhow::Result<Notifier> {
-    let service_notification = match service_attrs.get(&Yaml::String("notification".into())) {
-        Some(notification) => notification,
-        None => bail!("'notification' is mandatory map field for a service."),
-    };
-    let notification_map = match service_notification.as_hash() {
-        Some(map) => map,
-        None => bail!("'notification' is not valid map."),
-    };
-
-    Notifier::try_from(notification_map)
 }

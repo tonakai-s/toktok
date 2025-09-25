@@ -66,7 +66,7 @@ impl TaskLogger {
         )
     }
 
-    pub fn log(&mut self, execution_result: ExecutionResult) {
+    pub fn log(&mut self, execution_result: &ExecutionResult) {
         if self.file_date != Zoned::now().date() {
             self.update_file();
         }

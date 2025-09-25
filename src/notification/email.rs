@@ -65,7 +65,7 @@ impl Notifier for MailNotifier {
 
         match self.mailer.send(&email) {
             Ok(_) => event!(
-                Level::TRACE,
+                Level::INFO,
                 "Email notification sent successfully"
             ),
             Err(err) => event!(
@@ -120,13 +120,13 @@ impl TryFrom<&Hash> for MailNotifier {
         if let Some(username) = buff_iter.next()
             && let Some(password) = buff_iter.next()
         {
-            return MailNotifier::new(
+            MailNotifier::new(
                 username.into(),
                 password.into(),
                 smtp_domain.into(),
                 from.into(),
                 to.into(),
-            );
+            )
         } else {
             bail!(
                 "Mailer credentials username and password cannot be empty.\nExpected file format: first line = username, second line = password"

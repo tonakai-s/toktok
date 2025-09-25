@@ -129,7 +129,7 @@ impl TryFrom<&Hash> for MailNotifier {
             );
         } else {
             bail!(
-                "Mailer credentials username and password cannot be empty.\nExpected file format: fist line = username, second line = password"
+                "Mailer credentials username and password cannot be empty.\nExpected file format: first line = username, second line = password"
             )
         }
     }

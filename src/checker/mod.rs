@@ -1,6 +1,7 @@
 use anyhow::bail;
 use yaml_rust2::{yaml::Hash, Yaml};
 
+pub mod structs;
 pub mod web;
 pub use web::WebChecker;
 

@@ -8,7 +8,7 @@ use anyhow::{Result, bail};
 use jiff::{Zoned, civil::Date};
 use tracing::{Level, event, span};
 
-use crate::executor::ExecutionResult;
+use crate::checker::structs::CheckerResult;
 
 #[derive(Debug)]
 pub struct TaskLogger {
@@ -83,7 +83,7 @@ impl TaskLogger {
         )
     }
 
-    pub fn log(&mut self, execution_result: &ExecutionResult) {
+    pub fn log(&mut self, execution_result: &CheckerResult) {
         let span = span!(Level::TRACE, "task_logger::log");
         let _enter = span.enter();
 

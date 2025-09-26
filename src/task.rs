@@ -1,7 +1,7 @@
 use jiff::{Zoned, civil::DateTime};
 
 use crate::{
-    checker::Checker, executor::ExecutionResult, task_info::TaskInfo, task_logger::TaskLogger,
+    checker::{structs::CheckerResult, Checker}, task_info::TaskInfo, task_logger::TaskLogger,
 };
 
 #[derive(Debug)]
@@ -44,7 +44,7 @@ impl Task {
         &self.checker
     }
 
-    pub fn log(&mut self, exec_result: &ExecutionResult) {
+    pub fn log(&mut self, exec_result: &CheckerResult) {
         self.logger.log(&exec_result);
     }
 }

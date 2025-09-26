@@ -1,50 +1,19 @@
-use std::{fmt::Display, sync::mpsc::Sender};
+use std::sync::mpsc::Sender;
 
 use tracing::{Level, event};
 
 use crate::{
-    checker::{WebChecker, Checker},
+    checker::{structs::{CheckerResult, CheckerStatus}, Checker, WebChecker},
     task::Task,
 };
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum ExecutionStatus {
-    Success,
-    Error,
-    Timeout,
-}
-#[derive(Debug)]
-pub struct ExecutionResult {
-    pub service_name: String,
-    pub status: ExecutionStatus,
-    pub message: String,
-}
-impl ExecutionResult {
-    fn new(service_name: String, status: ExecutionStatus, message: String) -> Self {
-        Self {
-            service_name,
-            status,
-            message,
-        }
-    }
-}
-impl Display for ExecutionStatus {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ExecutionStatus::Success => write!(f, "Success"),
-            ExecutionStatus::Error => write!(f, "Error"),
-            ExecutionStatus::Timeout => write!(f, "Timeout"),
-        }
-    }
-}
-
-pub async fn execute(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<ExecutionResult>) {
+pub async fn execute(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<CheckerResult>) {
     task.set_last_execution_at();
     let checker_result = match task.checker() {
         Checker::Web(web_data) => web_execute(&task.name(), &web_data).await,
     };
     task.log(&checker_result);
-    if checker_result.status != ExecutionStatus::Success {
+    if checker_result.status != CheckerStatus::Success {
         if let Err(err) = tx_notifier.send(checker_result) {
             event!(
                 Level::ERROR,
@@ -64,27 +33,27 @@ pub async fn execute(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<
     }
 }
 
-pub async fn web_execute(service: &str, data: &WebChecker) -> ExecutionResult {
+pub async fn web_execute(service: &str, data: &WebChecker) -> CheckerResult {
     let response = reqwest::get(data.url()).await;
     match response {
         std::result::Result::Ok(response) => {
             if response.status() == *data.expected_code() {
-                ExecutionResult::new(
+                CheckerResult::new(
                     service.to_string(),
-                    ExecutionStatus::Success,
+                    CheckerStatus::Success,
                     format!("Service available with status {}", response.status()),
                 )
             } else {
-                ExecutionResult::new(
+                CheckerResult::new(
                     service.to_string(),
-                    ExecutionStatus::Error,
+                    CheckerStatus::Error,
                     format!("Service unavailable with status {}", response.status()),
                 )
             }
         }
-        Err(err) => ExecutionResult::new(
+        Err(err) => CheckerResult::new(
             service.to_string(),
-            ExecutionStatus::Error,
+            CheckerStatus::Error,
             format!("Service unavailable: {err}"),
         ),
     }

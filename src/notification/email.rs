@@ -7,7 +7,7 @@ use lettre::{
 use tracing::{event, span, Level};
 use yaml_rust2::{Yaml, yaml::Hash};
 
-use crate::{executor::ExecutionResult, notification::Notifier};
+use crate::{checker::structs::CheckerResult, notification::Notifier};
 
 #[derive(Debug, Clone)]
 pub struct MailNotifier {
@@ -47,8 +47,8 @@ impl MailNotifier {
 }
 
 impl Notifier for MailNotifier {
-    fn notify(&self, exec_result: &ExecutionResult) {
-        let span = span!(Level::TRACE, "MailNotifier::notify");
+    fn notify(&self, exec_result: &CheckerResult) {
+        let span = span!(Level::INFO, "MailNotifier::notify");
         let _enter = span.enter();
 
         let body = format!(

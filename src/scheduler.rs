@@ -8,11 +8,7 @@ use jiff::Zoned;
 use tracing::{Level, event};
 
 use crate::{
-    configuration::Configuration,
-    executor::{self, ExecutionResult},
-    notification::Notifier,
-    queue::PriorityQueue,
-    task::Task,
+    checker::structs::CheckerResult, configuration::Configuration, executor, notification::Notifier, queue::PriorityQueue, task::Task
 };
 
 #[derive(Debug)]
@@ -41,7 +37,7 @@ impl Scheduler {
         );
 
         let (tx_task, rx_task) = channel::<Task>();
-        let (tx_notifier, rx_notifier) = channel::<ExecutionResult>();
+        let (tx_notifier, rx_notifier) = channel::<CheckerResult>();
         let task_queue = self.tasks.clone();
         tokio::spawn(async move {
             event!(

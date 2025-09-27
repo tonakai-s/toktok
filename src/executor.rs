@@ -3,14 +3,14 @@ use std::sync::mpsc::Sender;
 use tracing::{Level, event};
 
 use crate::{
-    checker::{structs::{CheckerResult, CheckerStatus}, Checker, WebChecker},
+    checker::{structs::{CheckerResult, CheckerStatus}, Checker},
     task::Task,
 };
 
-pub async fn execute(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<CheckerResult>) {
+pub async fn execute_check(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<CheckerResult>) {
     task.set_last_execution_at();
     let checker_result = match task.checker() {
-        Checker::Web(web_data) => web_execute(&task.name(), &web_data).await,
+        Checker::Web(checker) => checker.check(&task.name()).await,
     };
     task.log(&checker_result);
     if checker_result.status != CheckerStatus::Success {
@@ -30,31 +30,5 @@ pub async fn execute(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<
             error = %err,
             "Error sending task to the enqueuer thread"
         );
-    }
-}
-
-pub async fn web_execute(service: &str, data: &WebChecker) -> CheckerResult {
-    let response = reqwest::get(data.url()).await;
-    match response {
-        std::result::Result::Ok(response) => {
-            if response.status() == *data.expected_code() {
-                CheckerResult::new(
-                    service.to_string(),
-                    CheckerStatus::Success,
-                    format!("Service available with status {}", response.status()),
-                )
-            } else {
-                CheckerResult::new(
-                    service.to_string(),
-                    CheckerStatus::Error,
-                    format!("Service unavailable with status {}", response.status()),
-                )
-            }
-        }
-        Err(err) => CheckerResult::new(
-            service.to_string(),
-            CheckerStatus::Error,
-            format!("Service unavailable: {err}"),
-        ),
     }
 }

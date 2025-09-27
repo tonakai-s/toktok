@@ -9,7 +9,7 @@ async fn main() {
     let config = match load_config() {
         Ok(s) => s,
         Err(err) => {
-            eprintln!("{err}");
+            eprintln!("The program found an error during the configuration parse:\n{err}");
             exit(1);
         }
     };

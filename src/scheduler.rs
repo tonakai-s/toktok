@@ -78,7 +78,7 @@ impl Scheduler {
                     let tx_task = tx_task.clone();
                     let tx_notifier = tx_notifier.clone();
                     tokio::spawn(async move {
-                        executor::execute(task, tx_task, tx_notifier).await;
+                        executor::execute_check(task, tx_task, tx_notifier).await;
                     });
                 }
             }

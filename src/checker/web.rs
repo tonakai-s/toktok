@@ -2,10 +2,11 @@ use anyhow::bail;
 use reqwest::StatusCode;
 use yaml_rust2::{yaml::Hash, Yaml};
 
+use crate::checker::structs::{CheckerResult, CheckerStatus};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WebChecker {
     domain: String,
-    #[allow(dead_code)]
     path: Option<String>,
     url: Option<String>,
     expected_code: StatusCode,
@@ -22,7 +23,7 @@ impl WebChecker {
         }
     }
 
-    pub fn url(&self) -> &str {
+    fn url(&self) -> &str {
         if let Some(ref url) = self.url {
             url
         } else {
@@ -32,6 +33,32 @@ impl WebChecker {
 
     pub fn expected_code(&self) -> &StatusCode {
         &self.expected_code
+    }
+
+    pub async fn check(&self, service: &str) -> CheckerResult {
+        let response = reqwest::get(self.url()).await;
+        match response {
+            std::result::Result::Ok(response) => {
+                if response.status() == self.expected_code {
+                    CheckerResult::new(
+                        service.to_string(),
+                        CheckerStatus::Success,
+                        format!("Service available with status {}", response.status()),
+                    )
+                } else {
+                    CheckerResult::new(
+                        service.to_string(),
+                        CheckerStatus::Error,
+                        format!("Service unavailable with status {}", response.status()),
+                    )
+                }
+            }
+            Err(err) => CheckerResult::new(
+                service.to_string(),
+                CheckerStatus::Error,
+                format!("Service unavailable: {err}"),
+            ),
+        }
     }
 }
 

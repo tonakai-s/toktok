@@ -11,6 +11,7 @@ pub async fn execute_check(mut task: Task, tx_task: Sender<Task>, tx_notifier: S
     task.set_last_execution_at();
     let checker_result = match task.checker() {
         Checker::Web(checker) => checker.check(&task.name()).await,
+        Checker::Server(checker) => checker.check(&task.name()).await,
     };
     task.log(&checker_result);
     if checker_result.status != CheckerStatus::Success {

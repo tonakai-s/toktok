@@ -13,6 +13,12 @@ services:
       type: Web
       domain: 'https://tuamaeaquelaursa.com'
       expected_http_code: 200
+  server.internal.tcp:
+    interval: 10
+    configuration:
+      type: server
+      socket: 127.0.0.1:22
+      timeout: 10
 
 notification:
   mailer:

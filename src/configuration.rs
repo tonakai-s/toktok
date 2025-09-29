@@ -1,10 +1,26 @@
-use std::io::Read;
+use std::{fmt::Display, io::{self, Read}};
 
 use anyhow::bail;
 use jiff::SignedDuration;
-use yaml_rust2::{Yaml, YamlLoader, yaml::Hash};
+use yaml_rust2::{ScanError, Yaml, YamlLoader, yaml::Hash};
 
 use crate::{checker::Checker, notification::email::MailNotifier, task::Task, task_info::TaskInfo};
+
+#[derive(Debug)]
+pub enum ConfigurationFileError {
+    UnableToOpen(io::Error),
+    UnableToRead(io::Error),
+    UnableToScan(ScanError),
+}
+impl Display for ConfigurationFileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigurationFileError::UnableToOpen(err) => write!(f, "Error trying to open the config file: {:?}", err),
+            ConfigurationFileError::UnableToRead(err) => write!(f, "Error trying to read the config file: {:?}", err),
+            ConfigurationFileError::UnableToScan(err) => write!(f, "Error interpreting the basic structure of config file: {:?}", err),
+        }
+    }
+}
 
 pub struct Configuration {
     pub tasks: Vec<Task>,
@@ -23,18 +39,15 @@ pub fn load_config() -> anyhow::Result<Configuration> {
     let mut content = String::new();
     let mut file = match std::fs::File::open("toktok.yaml") {
         Ok(f) => f,
-        Err(err) => bail!("Error trying to open the config file: {:#?}", err),
+        Err(err) => bail!(ConfigurationFileError::UnableToOpen(err)),
     };
     match file.read_to_string(&mut content) {
         Ok(_) => {}
-        Err(err) => bail!("Error trying to read the config file: {:#?}", err),
+        Err(err) => bail!(ConfigurationFileError::UnableToRead(err)),
     };
     let mut config = match YamlLoader::load_from_str(&content) {
         Ok(c) => c,
-        Err(err) => bail!(
-            "Error interpreting basic structure of config file: {:#?}",
-            err
-        ),
+        Err(err) => bail!(ConfigurationFileError::UnableToScan(err)),
     };
 
     parse_config(&mut config)

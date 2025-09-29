@@ -1,6 +1,6 @@
 use std::{fs, io::Read, path::PathBuf};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use lettre::{
     message::{header::ContentType, Mailbox}, transport::smtp::authentication::Credentials, Address, Message, SmtpTransport, Transport
 };
@@ -8,6 +8,11 @@ use tracing::{event, span, Level};
 use yaml_rust2::{Yaml, yaml::Hash};
 
 use crate::{checker::structs::CheckerResult, notification::Notifier};
+
+struct MailCredentials {
+    user: String,
+    pass: String
+}
 
 #[derive(Debug, Clone)]
 pub struct MailNotifier {
@@ -18,12 +23,17 @@ pub struct MailNotifier {
     _bcc: Option<String>,
 }
 impl MailNotifier {
-    fn new(user: String, pass: String, domain: String, from: String, to: String) -> Result<Self> {
-        let creds = Credentials::new(user, pass);
-        let mailer = SmtpTransport::relay(&domain)
-            .unwrap()
-            .credentials(creds)
-            .build();
+    fn new(credentials: Option<MailCredentials>, domain: String, from: String, to: String) -> Result<Self> {
+        let mailer: SmtpTransport = if let Some(credentials) = credentials {
+            SmtpTransport::relay(&domain)
+                .unwrap()
+                .credentials(
+                    Credentials::new(credentials.user, credentials.pass)
+                )
+                .build()
+        } else {
+            SmtpTransport::builder_dangerous(&domain).build()
+        };
 
         let from_address = match from.parse::<Address>() {
             Ok(addr) => addr,
@@ -80,10 +90,6 @@ impl Notifier for MailNotifier {
 impl TryFrom<&Hash> for MailNotifier {
     type Error = anyhow::Error;
     fn try_from(data: &Hash) -> Result<Self, Self::Error> {
-        let credentials_file_path = match data.get(&Yaml::String("smtp_credentials".into())) {
-            Some(cred) => cred.as_str().unwrap(),
-            None => bail!("Key 'smtp_credentials' is mandatory for 'mailer'"),
-        };
         let smtp_domain = match data.get(&Yaml::String("smtp_domain".into())) {
             Some(domain) => domain.as_str().unwrap(),
             None => bail!("Key 'smtp_domain' is mandatory for 'mailer'"),
@@ -97,40 +103,45 @@ impl TryFrom<&Hash> for MailNotifier {
             None => bail!("Key 'to' is mandatory for 'mailer'"),
         };
 
-        let creds_path = PathBuf::from(credentials_file_path);
-        if !creds_path.exists() {
-            bail!("Path in 'smtp_credentials' does not exists");
-        }
+        let credentials: Option<MailCredentials> = match data.get(&Yaml::String("smtp_credentials".into())) {
+            Some(creds) => {
+                let credentials_path = creds.as_str().unwrap();
+                let credentials_path = PathBuf::from(credentials_path);
+                if !credentials_path.exists() {
+                    bail!("Path in 'smtp_credentials' does not exists");
+                }
 
-        let mut file = match fs::File::open(creds_path) {
-            Ok(f) => f,
-            Err(err) => bail!("Unable to open the credentials file: {}", err),
+                let mut file = match fs::File::open(credentials_path) {
+                    Ok(f) => f,
+                    Err(err) => bail!("Unable to open the credentials file: {}", err),
+                };
+                let mut buff = String::new();
+                match file.read_to_string(&mut buff) {
+                    Ok(_) => (),
+                    Err(_) => bail!("The credentials file must contain only valid UTF-8 characters"),
+                }
+
+                if buff.is_empty() {
+                    bail!("Mailer credentials file is empty")
+                }
+
+                let mut buff_iter = buff.lines().take(2).into_iter();
+                if let Some(username) = buff_iter.next()
+                    && let Some(password) = buff_iter.next()
+                {
+                    Some(MailCredentials { user: username.into(), pass: password.into()})
+                } else {
+                    None
+                }
+            },
+            None => None
         };
-        let mut buff = String::new();
-        match file.read_to_string(&mut buff) {
-            Ok(_) => (),
-            Err(_) => bail!("The credentials file must contain only valid UTF-8 characters"),
-        }
 
-        if buff.is_empty() {
-            bail!("Mailer credentials file is empty")
-        }
-
-        let mut buff_iter = buff.lines().take(2).into_iter();
-        if let Some(username) = buff_iter.next()
-            && let Some(password) = buff_iter.next()
-        {
-            MailNotifier::new(
-                username.into(),
-                password.into(),
-                smtp_domain.into(),
-                from.into(),
-                to.into(),
-            )
-        } else {
-            bail!(
-                "Mailer credentials username and password cannot be empty.\nExpected file format: first line = username, second line = password"
-            )
-        }
+        MailNotifier::new(
+            credentials,
+            smtp_domain.into(),
+            from.into(),
+            to.into(),
+        )
     }
 }

@@ -5,9 +5,9 @@ use lettre::{
     message::{header::ContentType, Mailbox}, transport::smtp::authentication::Credentials, Address, Message, SmtpTransport, Transport
 };
 use tracing::{event, span, Level};
-use yaml_rust2::{Yaml, yaml::Hash};
+use yaml_rust2::Yaml;
 
-use crate::{checker::structs::CheckerResult, notification::Notifier};
+use crate::{checker::structs::CheckerResult, configuration::ConfigurationParseError, notification::Notifier};
 
 struct MailCredentials {
     user: String,
@@ -87,24 +87,27 @@ impl Notifier for MailNotifier {
     }
 }
 
-impl TryFrom<&Hash> for MailNotifier {
+const AT_WHY_DEFAULT_ERROR_MESSAGE: &'static str = "at mailer notification";
+impl TryFrom<&Yaml> for MailNotifier {
     type Error = anyhow::Error;
-    fn try_from(data: &Hash) -> Result<Self, Self::Error> {
-        let smtp_domain = match data.get(&Yaml::String("smtp_domain".into())) {
-            Some(domain) => domain.as_str().unwrap(),
-            None => bail!("Key 'smtp_domain' is mandatory for 'mailer'"),
-        };
-        let from = match data.get(&Yaml::String("from".into())) {
-            Some(from) => from.as_str().unwrap(),
-            None => bail!("Key 'from' is mandatory for 'mailer'"),
-        };
-        let to = match data.get(&Yaml::String("to".into())) {
-            Some(to) => to.as_str().unwrap(),
-            None => bail!("Key 'to' is mandatory for 'mailer'"),
-        };
+    fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
+        let smtp_domain = &data["smtp_domain"];
+        if smtp_domain.is_badvalue() {
+            bail!(ConfigurationParseError::KeyNotFound("smtp_domain", AT_WHY_DEFAULT_ERROR_MESSAGE));
+        }
 
-        let credentials: Option<MailCredentials> = match data.get(&Yaml::String("smtp_credentials".into())) {
-            Some(creds) => {
+        let from = &data["from"];
+        if smtp_domain.is_badvalue() {
+            bail!(ConfigurationParseError::KeyNotFound("from", AT_WHY_DEFAULT_ERROR_MESSAGE));
+        }
+
+        let to = &data["from"];
+        if to.is_badvalue() {
+            bail!(ConfigurationParseError::KeyNotFound("to", AT_WHY_DEFAULT_ERROR_MESSAGE));
+        }
+
+        let credentials: Option<MailCredentials> = match &data["smtp_credentials"] {
+            creds if !creds.is_badvalue() && creds.as_str().is_some() => {
                 let credentials_path = creds.as_str().unwrap();
                 let credentials_path = PathBuf::from(credentials_path);
                 if !credentials_path.exists() {
@@ -134,14 +137,14 @@ impl TryFrom<&Hash> for MailNotifier {
                     None
                 }
             },
-            None => None
+            _ => None
         };
 
         MailNotifier::new(
             credentials,
-            smtp_domain.into(),
-            from.into(),
-            to.into(),
+            smtp_domain.as_str().unwrap().into(),
+            from.as_str().unwrap().into(),
+            to.as_str().unwrap().into(),
         )
     }
 }

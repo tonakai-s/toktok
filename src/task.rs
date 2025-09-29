@@ -13,7 +13,7 @@ pub struct Task {
 
 impl Task {
     pub fn new(info: TaskInfo, checker: Checker) -> Self {
-        let logger = match TaskLogger::new(info.name.clone(), None) {
+        let logger = match TaskLogger::new(&info.name) {
             Ok(tl) => tl,
             Err(err) => panic!("{}", err),
         };

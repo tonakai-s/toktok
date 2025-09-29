@@ -10,6 +10,11 @@ use tracing::{Level, event, span};
 
 use crate::checker::structs::CheckerResult;
 
+#[cfg(target_os="linux")]
+const DEFAULT_LOGGER_FOLDER: &'static str = "/tmp/toktok/log/general/";
+#[cfg(target_os="windows")]
+const DEFAULT_LOGGER_FOLDER: &'static str = "%TEMP%/toktok/log/general/";
+
 #[derive(Debug)]
 pub struct TaskLogger {
     filename: String,
@@ -19,17 +24,13 @@ pub struct TaskLogger {
 }
 
 impl TaskLogger {
-    pub fn new(filename: String, dir: Option<&str>) -> Result<Self> {
+    pub fn new(task_name: &str) -> Result<Self> {
         let span = span!(Level::TRACE, "task_logger::new");
         let _enter = span.enter();
 
-        let filename = TaskLogger::todays_filename(&filename);
-        let mut log_dir = "/tmp/toktok/";
-        if let Some(dir) = dir {
-            log_dir = dir.trim_end_matches('/');
-        }
+        let filename = TaskLogger::todays_filename(&task_name);
 
-        let log_path = PathBuf::from(log_dir);
+        let log_path = TaskLogger::folder(&task_name);
         if !log_path.exists() {
             match fs::create_dir_all(&log_path) {
                 Ok(_) => (),
@@ -40,7 +41,7 @@ impl TaskLogger {
             }
         }
 
-        let full_log_filepath = format!("{}{}", log_dir, filename);
+        let full_log_filepath = format!("{}{}", log_path.to_str().unwrap(), filename);
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists() {
             if let Err(err) = fs::File::create(&full_log_filepath) {
@@ -72,14 +73,23 @@ impl TaskLogger {
         })
     }
 
-    fn todays_filename(filename: &str) -> String {
+    fn folder(task_name: &str) -> PathBuf {
+        let file_path = format!(
+            "{}{}/",
+            DEFAULT_LOGGER_FOLDER,
+            task_name,
+        );
+        PathBuf::from(file_path)
+    }
+
+    fn todays_filename(task_name: &str) -> String {
         let today = Zoned::now().date();
         format!(
             "{}-{}-{}-{}.log",
             today.year(),
             today.month(),
             today.day(),
-            filename
+            task_name
         )
     }
 

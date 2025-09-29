@@ -10,11 +10,6 @@ use tracing::{Level, event, span};
 
 use crate::checker::structs::CheckerResult;
 
-#[cfg(target_os="linux")]
-const DEFAULT_LOGGER_FOLDER: &'static str = "/tmp/toktok/log/general/";
-#[cfg(target_os="windows")]
-const DEFAULT_LOGGER_FOLDER: &'static str = "%TEMP%/toktok/log/general/";
-
 #[derive(Debug)]
 pub struct TaskLogger {
     filename: String,
@@ -74,9 +69,11 @@ impl TaskLogger {
     }
 
     fn folder(task_name: &str) -> PathBuf {
+        let tempdir = std::env::temp_dir();
         let file_path = format!(
-            "{}{}/",
-            DEFAULT_LOGGER_FOLDER,
+            "{}{}/{}/",
+            tempdir.to_str().unwrap(),
+            "toktok",
             task_name,
         );
         PathBuf::from(file_path)

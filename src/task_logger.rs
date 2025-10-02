@@ -70,13 +70,23 @@ impl TaskLogger {
 
     fn folder(task_name: &str) -> PathBuf {
         let tempdir = std::env::temp_dir();
-        let file_path = format!(
-            "{}{}/{}/",
-            tempdir.to_str().unwrap(),
-            "toktok",
-            task_name,
-        );
-        PathBuf::from(file_path)
+        if tempdir.ends_with("/") {
+            let file_path = format!(
+                "{}{}/{}/",
+                tempdir.to_str().unwrap(),
+                "toktok",
+                task_name,
+            );
+            PathBuf::from(file_path)
+        } else {
+            let file_path = format!(
+                "{}/{}/{}/",
+                tempdir.to_str().unwrap(),
+                "toktok",
+                task_name,
+            );
+            PathBuf::from(file_path)
+        }
     }
 
     fn todays_filename(task_name: &str) -> String {

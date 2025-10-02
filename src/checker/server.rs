@@ -1,9 +1,9 @@
 use std::{net::{SocketAddr, TcpStream}, str::FromStr, time::Duration};
 
 use anyhow::{bail, Result};
-use yaml_rust2::{yaml::Hash, Yaml};
+use yaml_rust2::Yaml;
 
-use crate::checker::{structs::{CheckerResult, CheckerStatus}};
+use crate::{checker::structs::{CheckerResult, CheckerStatus}, configuration::ConfigurationParseError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ServerChecker {
@@ -19,15 +19,12 @@ impl ServerChecker {
         Self { host, timeout }
     }
 
-    pub fn parse_timeout(data: &Hash) -> Result<Option<Duration>> {
-        let timeout = match data.get(&Yaml::String("timeout".into())) {
-            Some(t)  => t.as_i64().unwrap(),
-            None => return Ok(None)
+    pub fn parse_timeout(data: &Yaml) -> Result<Option<Duration>> {
+        let timeout = match data["timeout"] {
+            Yaml::BadValue => return Ok(None),
+            Yaml::Integer(t) if t > 0 => t,
+            _ => return Ok(None)
         };
-
-        if timeout <= 0 {
-            bail!("Key 'timeout' must be a number greater than zero");
-        }
 
         Ok(Some(Duration::from_secs_f64(timeout as f64)))
     }
@@ -55,12 +52,12 @@ impl ServerChecker {
     }
 }
 
-impl TryFrom<&Hash> for ServerChecker {
+impl TryFrom<&Yaml> for ServerChecker {
     type Error = anyhow::Error;
-    fn try_from(value: &Hash) -> Result<Self, Self::Error> {
-        let socket = match value.get(&Yaml::String("socket".into())) {
-            Some(socket) => socket.as_str().unwrap(),
-            None => bail!("Key 'socket' is mandatory for service of type server"),
+    fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
+        let socket = match &data["socket"] {
+            Yaml::String(s) if !s.is_empty() => s,
+            _ => bail!(ConfigurationParseError::KeyNotFound("socket", "at service of type server and cannot be empty")),
         };
 
         let socket_split = socket.split(':').collect::<Vec<&str>>();
@@ -68,8 +65,8 @@ impl TryFrom<&Hash> for ServerChecker {
             bail!("Key 'socket' must follow the pattern HOST:PORT");
         }
 
-        let timeout = ServerChecker::parse_timeout(value)?;
-        match SocketAddr::from_str(socket) {
+        let timeout = ServerChecker::parse_timeout(data)?;
+        match SocketAddr::from_str(&socket) {
             Ok(socket_addr) => Ok(ServerChecker::new(socket_addr, timeout)),
             Err(err) => bail!("Invalid socket at configuration: {}", err)
         }

@@ -2,7 +2,7 @@ use std::{fmt::Display, io::{self, Read}};
 
 use anyhow::bail;
 use jiff::SignedDuration;
-use yaml_rust2::{ScanError, Yaml, YamlLoader, yaml::Hash};
+use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
 use crate::{checker::Checker, notification::email::MailNotifier, task::Task, task_info::TaskInfo};
 
@@ -22,17 +22,22 @@ impl Display for ConfigurationFileError {
     }
 }
 
+type Key = &'static str;
+type AtWhy = &'static str;
+type Service = String;
 #[derive(Debug)]
 pub enum ConfigurationParseError {
-    KeyNotFound(&'static str, &'static str)
+    KeyNotFound(Key, AtWhy),
+    NoServiceProvided,
+    InvalidServiceMap(Service)
 }
 impl Display for ConfigurationParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let error = match self {
-            ConfigurationParseError::KeyNotFound(key, at_why) => format!("Mandatory key not found: {} {}", key, at_why),
-        };
-
-        write!(f, "{error}")
+        match self {
+            ConfigurationParseError::KeyNotFound(key, at_why) => write!(f, "Mandatory key not found: {} {}", key, at_why),
+            ConfigurationParseError::NoServiceProvided => write!(f, "None service provided, aborting."),
+            ConfigurationParseError::InvalidServiceMap(key) => write!(f, "A key has a invalid map: {}", key)
+        }
     }
 }
 
@@ -101,28 +106,26 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Vec<Task>> {
 
     let services_map = match section.1.as_hash() {
         Some(map) => map,
-        None => bail!("None service provided, aborting."),
+        None => bail!(ConfigurationParseError::NoServiceProvided),
     };
     for service in services_map.iter() {
         let service_name = service.0.as_str().unwrap().to_string();
-        let service_map = match service.1.as_hash() {
-            Some(map) => map,
-            None => bail!("Provided service is not a valid map"),
-        };
-        let interval = interval(service_map)?;
+
+        let interval = interval(service.1)?;
         let info = TaskInfo::new(service_name, interval);
-        let checker = type_data(service_map)?;
+        let checker = get_checker(service.1)?;
 
         tasks.push(Task::new(info, checker));
     }
 
     Ok(tasks)
 }
-fn interval(service_attrs: &Hash) -> anyhow::Result<SignedDuration> {
-    let interval_value = match service_attrs.get(&Yaml::String("interval".into())) {
-        Some(value) => value,
-        None => bail!("'interval' is mandatory field for a service."),
-    };
+fn interval(service_attrs: &Yaml) -> anyhow::Result<SignedDuration> {
+    let interval_value = &service_attrs["interval"];
+    if interval_value.is_badvalue() {
+        bail!("'interval' is mandatory field for a service.");
+    }
+
     match interval_value.as_i64() {
         Some(interval) => {
             if interval < 0 {
@@ -134,15 +137,14 @@ fn interval(service_attrs: &Hash) -> anyhow::Result<SignedDuration> {
         None => bail!("'interval' must be a number."),
     }
 }
-fn type_data(service_attrs: &Hash) -> anyhow::Result<Checker> {
-    let service_config = match service_attrs.get(&Yaml::String("configuration".into())) {
-        Some(config) => config,
-        None => bail!("'configuration' is mandatory map field for a service."),
-    };
-    let config_map = match service_config.as_hash() {
-        Some(map) => map,
-        None => bail!("'configuration' is not valid map."),
+fn get_checker(service_attrs: &Yaml) -> anyhow::Result<Checker> {
+    let service_config = &service_attrs["configuration"];
+    if service_config.is_badvalue() {
+        bail!("'configuration' is mandatory map field for a service.");
+    }
+    if service_config.as_hash().is_none() {
+        bail!("'configuration' is not valid map.");
     };
 
-    Checker::try_from(config_map)
+    Checker::try_from(service_config)
 }

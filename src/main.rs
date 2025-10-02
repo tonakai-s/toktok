@@ -1,10 +1,13 @@
 use std::process::exit;
 
 use toktok::{configuration::load_config, scheduler::Scheduler};
+use tracing::{event, Level};
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+    
+    event!(Level::INFO, temp_dir_path = std::env::temp_dir().to_str().unwrap());
 
     let config = match load_config() {
         Ok(s) => s,

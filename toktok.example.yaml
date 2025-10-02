@@ -13,6 +13,8 @@ services:
       type: Web
       domain: 'https://tuamaeaquelaursa.com'
       expected_http_code: 200
+      headers:
+        Content-type: 'application/json'
   server.internal.tcp:
     interval: 10
     configuration:

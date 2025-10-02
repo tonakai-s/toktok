@@ -1,33 +1,33 @@
+use std::str::FromStr;
+
 use anyhow::bail;
-use reqwest::StatusCode;
-use yaml_rust2::{yaml::Hash, Yaml};
+use reqwest::{header::{HeaderMap, HeaderName, HeaderValue}, Client, RequestBuilder, StatusCode};
+use yaml_rust2::Yaml;
 
-use crate::checker::structs::{CheckerResult, CheckerStatus};
+use crate::{checker::structs::{CheckerResult, CheckerStatus}, configuration::ConfigurationParseError};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct WebChecker {
-    domain: String,
-    path: Option<String>,
-    url: Option<String>,
+    req_builder: RequestBuilder,
     expected_code: StatusCode,
 }
 
 impl WebChecker {
-    pub fn new(domain: String, path: Option<String>, expected_code: StatusCode) -> Self {
+    pub fn new(
+        domain: String,
+        path: Option<String>,
+        expected_code: StatusCode,
+        headers: Option<HeaderMap>
+    ) -> Self {
         let url = path.as_ref().map(|path| format!("{domain}{path}"));
-        Self {
-            domain,
-            path,
-            url,
-            expected_code,
-        }
-    }
 
-    fn url(&self) -> &str {
-        if let Some(ref url) = self.url {
-            url
-        } else {
-            self.domain.as_str()
+        let client = Client::new()
+            .get(url.unwrap_or(domain))
+            .headers(headers.unwrap_or_default());
+
+        Self {
+            req_builder: client,
+            expected_code,
         }
     }
 
@@ -36,7 +36,7 @@ impl WebChecker {
     }
 
     pub async fn check(&self, service: &str) -> CheckerResult {
-        let response = reqwest::get(self.url()).await;
+        let response = self.req_builder.try_clone().unwrap().send().await;
         match response {
             std::result::Result::Ok(response) => {
                 if response.status() == self.expected_code {
@@ -62,37 +62,50 @@ impl WebChecker {
     }
 }
 
-impl TryFrom<&Hash> for WebChecker {
+impl TryFrom<&Yaml> for WebChecker {
     type Error = anyhow::Error;
-    fn try_from(value: &Hash) -> Result<Self, Self::Error> {
-        let domain = match value.get(&Yaml::String("domain".into())) {
-            Some(d) => d.as_str().unwrap().to_string(),
-            None => bail!("'domain' is a mandatory field in web type service config"),
-        };
-        let path = value
-            .get(&Yaml::String("path".into()))
-            .map(|path| path.as_str().unwrap().to_string());
-        let expected_code =
-            match value.get(&Yaml::String("expected_http_code".into())) {
-                Some(code) => {
-                    if let Some(code) = code.as_i64()
-                        && code >= u16::MIN as i64
-                        && code <= u16::MAX as i64
-                    {
-                        code
-                    } else {
-                        bail!("'expected_http_code' must be a valid HTTP code")
-                    }
-                }
-                None => bail!(
-                    "'expected_http_code' is a mandatory field in web type service config"
-                ),
-            };
-        let http_code = match StatusCode::from_u16(expected_code as u16) {
-            Ok(code) => code,
-            Err(_) => bail!("'expected_http_code' must be a valid HTTP code"),
+    fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
+        let domain = match &data["domain"] {
+            Yaml::String(d) if !d.is_empty() => d.clone(),
+            _ => bail!(ConfigurationParseError::KeyNotFound("domain", "at service of type web and cannot be empty"))
         };
 
-        Ok(WebChecker::new(domain, path, http_code))
+        let path = match &data["path"] {
+            Yaml::String(p) if !p.is_empty() => Some(p.clone()),
+            _ => None
+        };
+
+        let expected_code = match data["expected_http_code"] {
+            Yaml::Integer(http_code) if http_code >= u16::MIN as i64 && http_code <= u16::MAX as i64 => http_code as u16,
+            _ => bail!(ConfigurationParseError::KeyNotFound("expected_http_code", "at service of type web and be a valid HTTP code"))
+        };
+
+        let http_code = match StatusCode::from_u16(expected_code as u16) {
+            Ok(code) => code,
+            Err(_) => bail!(ConfigurationParseError::KeyNotFound("expected_http_code", "at service of type web and be a valid HTTP code"))
+        };
+
+        let headers = match &data["headers"] {
+            Yaml::Hash(headers) => {
+                let mut header_map = HeaderMap::new();
+                for (key, value) in headers.iter() {
+                    match (key, value) {
+                        (Yaml::String(key), Yaml::String(value)) if !key.is_empty() && !value.is_empty() => {
+                            let header_name = HeaderName::from_str(key);
+                            let header_value = HeaderValue::from_str(value);
+                            if header_name.is_err() || header_value.is_err() {
+                                continue;
+                            }
+                            header_map.insert(header_name.unwrap(), header_value.unwrap());
+                        },
+                        _ => continue
+                    };
+                }
+                Some(header_map)
+            },
+            _ => None
+        };
+
+        Ok(WebChecker::new(domain, path, http_code, headers))
     }
 }

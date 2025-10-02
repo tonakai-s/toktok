@@ -1,4 +1,7 @@
-use std::{fmt::Display, io::{self, Read}};
+use std::{
+    fmt::Display,
+    io::{self, Read},
+};
 
 use anyhow::bail;
 use jiff::SignedDuration;
@@ -15,9 +18,16 @@ pub enum ConfigurationFileError {
 impl Display for ConfigurationFileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigurationFileError::UnableToOpen(err) => write!(f, "Error trying to open the config file: {:?}", err),
-            ConfigurationFileError::UnableToRead(err) => write!(f, "Error trying to read the config file: {:?}", err),
-            ConfigurationFileError::UnableToScan(err) => write!(f, "Error interpreting the basic structure of config file: {:?}", err),
+            ConfigurationFileError::UnableToOpen(err) => {
+                write!(f, "Error trying to open the config file: {err}")
+            }
+            ConfigurationFileError::UnableToRead(err) => {
+                write!(f, "Error trying to read the config file: {err}")
+            }
+            ConfigurationFileError::UnableToScan(err) => write!(
+                f,
+                "Error interpreting the basic structure of config file: {err}"
+            ),
         }
     }
 }
@@ -29,29 +39,28 @@ type Service = String;
 pub enum ConfigurationParseError {
     KeyNotFound(Key, AtWhy),
     NoServiceProvided,
-    InvalidServiceMap(Service)
+    InvalidServiceMap(Service),
 }
 impl Display for ConfigurationParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigurationParseError::KeyNotFound(key, at_why) => write!(f, "Mandatory key not found: {} {}", key, at_why),
-            ConfigurationParseError::NoServiceProvided => write!(f, "None service provided, aborting."),
-            ConfigurationParseError::InvalidServiceMap(key) => write!(f, "A key has a invalid map: {}", key)
+            ConfigurationParseError::KeyNotFound(key, at_why) => {
+                write!(f, "Mandatory key not found: {key} {at_why}")
+            }
+            ConfigurationParseError::NoServiceProvided => {
+                write!(f, "None service provided, aborting.")
+            }
+            ConfigurationParseError::InvalidServiceMap(key) => {
+                write!(f, "A key has a invalid map: {key}")
+            }
         }
     }
 }
 
+#[derive(Default)]
 pub struct Configuration {
     pub tasks: Vec<Task>,
     pub mailer: Option<MailNotifier>,
-}
-impl Default for Configuration {
-    fn default() -> Self {
-        Self {
-            tasks: vec![],
-            mailer: None,
-        }
-    }
 }
 
 pub fn load_config() -> anyhow::Result<Configuration> {
@@ -72,14 +81,14 @@ pub fn load_config() -> anyhow::Result<Configuration> {
     parse_config(&config)
 }
 
-fn parse_config(config: &Vec<Yaml>) -> anyhow::Result<Configuration> {
+fn parse_config(config: &[Yaml]) -> anyhow::Result<Configuration> {
     let mut configuration = Configuration::default();
     for section in config[0].as_hash().unwrap().iter() {
         if section.0.as_str().unwrap() == "services" {
             configuration.tasks = parse_services(&section)?;
         }
         if section.0.as_str().unwrap() == "notification" {
-            parse_notifications(&section.1, &mut configuration)?;
+            parse_notifications(section.1, &mut configuration)?;
         }
     }
 
@@ -95,10 +104,8 @@ fn parse_mailer(mailer: &Yaml) -> anyhow::Result<Option<MailNotifier>> {
     if mailer.is_badvalue() {
         return Ok(None);
     }
-    
-    Ok(
-        Some(MailNotifier::try_from(mailer)?)
-    )
+
+    Ok(Some(MailNotifier::try_from(mailer)?))
 }
 
 fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Vec<Task>> {

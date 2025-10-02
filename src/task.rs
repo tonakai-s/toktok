@@ -1,7 +1,9 @@
 use jiff::{Zoned, civil::DateTime};
 
 use crate::{
-    checker::{structs::CheckerResult, Checker}, task_info::TaskInfo, task_logger::TaskLogger,
+    checker::{Checker, structs::CheckerResult},
+    task_info::TaskInfo,
+    task_logger::TaskLogger,
 };
 
 #[derive(Debug)]
@@ -45,13 +47,13 @@ impl Task {
     }
 
     pub fn log(&mut self, exec_result: &CheckerResult) {
-        self.logger.log(&exec_result);
+        self.logger.log(exec_result);
     }
 }
 
 impl Ord for Task {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.next_execution_at().cmp(&other.next_execution_at())
+        self.next_execution_at().cmp(other.next_execution_at())
     }
 }
 impl PartialOrd for Task {

@@ -8,7 +8,8 @@ use jiff::Zoned;
 use tracing::{Level, event};
 
 use crate::{
-    checker::structs::CheckerResult, configuration::Configuration, executor, notification::Notifier, queue::PriorityQueue, task::Task
+    checker::structs::CheckerResult, configuration::Configuration, executor,
+    notification::Notifier, queue::PriorityQueue, task::Task,
 };
 
 #[derive(Debug)]

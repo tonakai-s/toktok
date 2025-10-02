@@ -35,9 +35,7 @@ impl Display for CheckerResult {
         write!(
             f,
             "Service: {} - Status: {} - Message: {}",
-            self.service_name,
-            self.status,
-            self.message
+            self.service_name, self.status, self.message
         )
     }
 }

@@ -23,41 +23,30 @@ impl TaskLogger {
         let span = span!(Level::TRACE, "task_logger::new");
         let _enter = span.enter();
 
-        let filename = TaskLogger::todays_filename(&task_name);
+        let filename = TaskLogger::todays_filename(task_name);
 
-        let log_path = TaskLogger::folder(&task_name);
+        let log_path = TaskLogger::folder(task_name);
         if !log_path.exists() {
             match fs::create_dir_all(&log_path) {
                 Ok(_) => (),
-                Err(err) => bail!(
-                    "The program was unable to create the logs directory. Error: {}",
-                    err
-                ),
+                Err(err) => {
+                    bail!("The program was unable to create the logs directory. Error: {err}")
+                }
             }
         }
 
         let full_log_filepath = format!("{}{}", log_path.to_str().unwrap(), filename);
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists() {
-            if let Err(err) = fs::File::create(&full_log_filepath) {
-                bail!(
-                    "The program was unable to create the logs file. Error: {}",
-                    err
-                );
+            if let Err(err) = fs::File::create(full_log_filepath) {
+                bail!("The program was unable to create the logs file. Error: {err}");
             }
         }
 
-        let file = match fs::OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(&full_log_filepath)
-        {
+        let file = match fs::OpenOptions::new().append(true).open(full_log_filepath) {
             Ok(file) => file,
             Err(err) => {
-                bail!(
-                    "The program was unable to open the logs file. Error: {}",
-                    err
-                );
+                bail!("The program was unable to open the logs file. Error: {err}");
             }
         };
         Ok(Self {
@@ -71,20 +60,10 @@ impl TaskLogger {
     fn folder(task_name: &str) -> PathBuf {
         let tempdir = std::env::temp_dir();
         if tempdir.ends_with("/") {
-            let file_path = format!(
-                "{}{}/{}/",
-                tempdir.to_str().unwrap(),
-                "toktok",
-                task_name,
-            );
+            let file_path = format!("{}{}/{}/", tempdir.to_str().unwrap(), "toktok", task_name,);
             PathBuf::from(file_path)
         } else {
-            let file_path = format!(
-                "{}/{}/{}/",
-                tempdir.to_str().unwrap(),
-                "toktok",
-                task_name,
-            );
+            let file_path = format!("{}/{}/{}/", tempdir.to_str().unwrap(), "toktok", task_name,);
             PathBuf::from(file_path)
         }
     }
@@ -110,7 +89,7 @@ impl TaskLogger {
 
         let content = format!(
             "[{}] {} - {}\n",
-            Zoned::now().datetime().to_string(),
+            Zoned::now().datetime(),
             execution_result.status,
             execution_result.message,
         );
@@ -134,7 +113,7 @@ impl TaskLogger {
         );
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists() {
-            if let Err(err) = fs::File::create(&full_log_filepath) {
+            if let Err(err) = fs::File::create(full_log_filepath) {
                 event!(
                     Level::ERROR,
                     error = %err,
@@ -146,7 +125,7 @@ impl TaskLogger {
             }
         }
 
-        let file = match fs::File::open(&full_log_filepath) {
+        let file = match fs::File::open(full_log_filepath) {
             Ok(file) => file,
             Err(err) => {
                 event!(

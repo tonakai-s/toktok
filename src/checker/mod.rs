@@ -1,16 +1,16 @@
 use anyhow::bail;
 use yaml_rust2::Yaml;
 
+pub mod server;
 pub mod structs;
 pub mod web;
-pub mod server;
 
-pub use web::WebChecker;
 pub use server::ServerChecker;
+pub use web::WebChecker;
 
 #[derive(Debug)]
 pub enum Checker {
-    Web(WebChecker),
+    Web(Box<WebChecker>),
     Server(ServerChecker),
 }
 
@@ -26,13 +26,16 @@ impl TryFrom<&Yaml> for Checker {
         match service_type.as_str() {
             Some("web") => {
                 let web_checker = WebChecker::try_from(config)?;
-                Ok(Checker::Web(web_checker))
-            },
+                Ok(Checker::Web(Box::new(web_checker)))
+            }
             Some("server") => {
                 let server_checker = ServerChecker::try_from(config)?;
                 Ok(Checker::Server(server_checker))
             }
-            _ => bail!("Type '{}' is not valid", service_type.as_str().unwrap_or("undefined")),
+            _ => bail!(
+                "Type '{}' is not valid",
+                service_type.as_str().unwrap_or("undefined")
+            ),
         }
     }
 }

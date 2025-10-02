@@ -3,11 +3,18 @@ use std::sync::mpsc::Sender;
 use tracing::{Level, event};
 
 use crate::{
-    checker::{structs::{CheckerResult, CheckerStatus}, Checker},
+    checker::{
+        Checker,
+        structs::{CheckerResult, CheckerStatus},
+    },
     task::Task,
 };
 
-pub async fn execute_check(mut task: Task, tx_task: Sender<Task>, tx_notifier: Sender<CheckerResult>) {
+pub async fn execute_check(
+    mut task: Task,
+    tx_task: Sender<Task>,
+    tx_notifier: Sender<CheckerResult>,
+) {
     task.set_last_execution_at();
     let checker_result = match task.checker() {
         Checker::Web(checker) => checker.check(&task.name()).await,

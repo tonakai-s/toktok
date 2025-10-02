@@ -2,18 +2,12 @@ use std::{cmp::Reverse, collections::BinaryHeap};
 
 use crate::task::Task;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct PriorityQueue {
     heap: BinaryHeap<Reverse<Task>>,
 }
 
 impl PriorityQueue {
-    pub fn default() -> Self {
-        Self {
-            heap: BinaryHeap::new(),
-        }
-    }
-
     pub fn dequeue(&mut self) -> Task {
         self.heap.pop().unwrap().0
     }

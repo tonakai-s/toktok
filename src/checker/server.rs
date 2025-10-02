@@ -1,21 +1,25 @@
-use std::{net::{SocketAddr, TcpStream}, str::FromStr, time::Duration};
+use std::{
+    net::{SocketAddr, TcpStream},
+    str::FromStr,
+    time::Duration,
+};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use yaml_rust2::Yaml;
 
-use crate::{checker::structs::{CheckerResult, CheckerStatus}, configuration::ConfigurationParseError};
+use crate::{
+    checker::structs::{CheckerResult, CheckerStatus},
+    configuration::ConfigurationParseError,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ServerChecker {
     host: SocketAddr,
-    timeout: Option<Duration>
+    timeout: Option<Duration>,
 }
 
 impl ServerChecker {
-    pub fn new(
-        host: SocketAddr,
-        timeout: Option<Duration>
-    ) -> Self {
+    pub fn new(host: SocketAddr, timeout: Option<Duration>) -> Self {
         Self { host, timeout }
     }
 
@@ -23,7 +27,7 @@ impl ServerChecker {
         let timeout = match data["timeout"] {
             Yaml::BadValue => return Ok(None),
             Yaml::Integer(t) if t > 0 => t,
-            _ => return Ok(None)
+            _ => return Ok(None),
         };
 
         Ok(Some(Duration::from_secs_f64(timeout as f64)))
@@ -33,16 +37,14 @@ impl ServerChecker {
         let stream = if self.timeout.is_some() {
             TcpStream::connect_timeout(&self.host, self.timeout.unwrap())
         } else {
-            TcpStream::connect(self.host.clone())
+            TcpStream::connect(self.host)
         };
         match stream {
-            Ok(_) => {
-                CheckerResult::new(
-                    service.to_string(),
-                    CheckerStatus::Success,
-                    "Server connected successfully via TCP/IP".into(),
-                )
-            }
+            Ok(_) => CheckerResult::new(
+                service.to_string(),
+                CheckerStatus::Success,
+                "Server connected successfully via TCP/IP".into(),
+            ),
             Err(err) => CheckerResult::new(
                 service.to_string(),
                 CheckerStatus::Error,
@@ -57,7 +59,10 @@ impl TryFrom<&Yaml> for ServerChecker {
     fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
         let socket = match &data["socket"] {
             Yaml::String(s) if !s.is_empty() => s,
-            _ => bail!(ConfigurationParseError::KeyNotFound("socket", "at service of type server and cannot be empty")),
+            _ => bail!(ConfigurationParseError::KeyNotFound(
+                "socket",
+                "at service of type server and cannot be empty"
+            )),
         };
 
         let socket_split = socket.split(':').collect::<Vec<&str>>();
@@ -66,9 +71,9 @@ impl TryFrom<&Yaml> for ServerChecker {
         }
 
         let timeout = ServerChecker::parse_timeout(data)?;
-        match SocketAddr::from_str(&socket) {
+        match SocketAddr::from_str(socket) {
             Ok(socket_addr) => Ok(ServerChecker::new(socket_addr, timeout)),
-            Err(err) => bail!("Invalid socket at configuration: {}", err)
+            Err(err) => bail!("Invalid socket at configuration: {err}"),
         }
     }
 }

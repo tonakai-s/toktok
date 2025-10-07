@@ -19,17 +19,8 @@ pub struct WebChecker {
 }
 
 impl WebChecker {
-    pub fn new(
-        domain: String,
-        path: Option<String>,
-        expected_code: StatusCode,
-        headers: Option<HeaderMap>,
-    ) -> Self {
-        let url = path.as_ref().map(|path| format!("{domain}{path}"));
-
-        let client = Client::new()
-            .get(url.unwrap_or(domain))
-            .headers(headers.unwrap_or_default());
+    pub fn new(url: String, expected_code: StatusCode, headers: Option<HeaderMap>) -> Self {
+        let client = Client::new().get(url).headers(headers.unwrap_or_default());
 
         Self {
             req_builder: client,
@@ -71,17 +62,12 @@ impl WebChecker {
 impl TryFrom<&Yaml> for WebChecker {
     type Error = anyhow::Error;
     fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
-        let domain = match &data["domain"] {
+        let url = match &data["url"] {
             Yaml::String(d) if !d.is_empty() => d.clone(),
             _ => bail!(ConfigurationParseError::KeyNotFound(
-                "domain",
+                "url",
                 "at service of type web and cannot be empty"
             )),
-        };
-
-        let path = match &data["path"] {
-            Yaml::String(p) if !p.is_empty() => Some(p.clone()),
-            _ => None,
         };
 
         let expected_code = match data["expected_http_code"] {
@@ -127,6 +113,6 @@ impl TryFrom<&Yaml> for WebChecker {
             _ => None,
         };
 
-        Ok(WebChecker::new(domain, path, http_code, headers))
+        Ok(WebChecker::new(url, http_code, headers))
     }
 }

@@ -1,18 +1,20 @@
 use std::process::exit;
 
-use toktok::{configuration::load_config, scheduler::Scheduler};
+use clap::Parser;
+use toktok::{args::Args, configuration::load_config, scheduler::Scheduler};
 use tracing::{Level, event};
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+    let args = Args::parse();
 
     event!(
         Level::INFO,
         temp_dir_path = std::env::temp_dir().to_str().unwrap()
     );
 
-    let config = match load_config() {
+    let config = match load_config(&args) {
         Ok(s) => s,
         Err(err) => {
             eprintln!("The program found an error during the configuration parse:\n{err}");

@@ -7,7 +7,9 @@ use anyhow::bail;
 use jiff::SignedDuration;
 use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
-use crate::{checker::Checker, notification::email::MailNotifier, task::Task, task_info::TaskInfo};
+use crate::{args::Args, checker::Checker, notification::email::MailNotifier, task::Task, task_info::TaskInfo};
+
+const DEFAULT_CONFIG_FILE: &str = "toktok.yaml";
 
 #[derive(Debug)]
 pub enum ConfigurationFileError {
@@ -63,9 +65,11 @@ pub struct Configuration {
     pub mailer: Option<MailNotifier>,
 }
 
-pub fn load_config() -> anyhow::Result<Configuration> {
+pub fn load_config(args: &Args) -> anyhow::Result<Configuration> {
     let mut content = String::new();
-    let mut file = match std::fs::File::open("toktok.yaml") {
+    let config_path = args.config.as_ref().map_or(DEFAULT_CONFIG_FILE, |config| &config);
+
+    let mut file = match std::fs::File::open(config_path) {
         Ok(f) => f,
         Err(err) => bail!(ConfigurationFileError::UnableToOpen(err)),
     };

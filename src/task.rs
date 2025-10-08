@@ -15,7 +15,7 @@ pub struct Task {
 
 impl Task {
     pub fn new(info: TaskInfo, checker: Checker) -> Self {
-        let logger = match TaskLogger::new(&info.name) {
+        let logger = match TaskLogger::try_new(&info.name) {
             Ok(tl) => tl,
             Err(err) => panic!("{}", err),
         };

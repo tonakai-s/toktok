@@ -1,13 +1,15 @@
 use std::{
     fmt::Display,
-    io::{self, Read}
+    io::{self, Read},
 };
 
-use anyhow::bail;
 use jiff::SignedDuration;
 use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
-use crate::{args::Args, checker::Checker, notification::email::MailNotifier, task::Task, task_info::TaskInfo};
+use crate::{
+    args::Args, checker::Checker, notification::email::MailNotifier, task::Task,
+    task_info::TaskInfo,
+};
 
 const DEFAULT_CONFIG_FILE: &str = "toktok.yaml";
 
@@ -65,27 +67,30 @@ pub struct Configuration {
     pub mailer: Option<MailNotifier>,
 }
 
-pub fn load_config(args: &Args) -> anyhow::Result<Configuration> {
+pub fn load_config(args: &Args) -> Result<Configuration, String> {
     let mut content = String::new();
-    let config_path = args.config.as_ref().map_or(DEFAULT_CONFIG_FILE, |config| &config);
+    let config_path = args
+        .config
+        .as_ref()
+        .map_or(DEFAULT_CONFIG_FILE, |config| config);
 
     let mut file = match std::fs::File::open(config_path) {
         Ok(f) => f,
-        Err(err) => bail!(ConfigurationFileError::UnableToOpen(err)),
+        Err(err) => return Err(format!("{}", ConfigurationFileError::UnableToOpen(err))),
     };
     match file.read_to_string(&mut content) {
         Ok(_) => {}
-        Err(err) => bail!(ConfigurationFileError::UnableToRead(err)),
+        Err(err) => return Err(format!("{}", ConfigurationFileError::UnableToRead(err))),
     };
     let config = match YamlLoader::load_from_str(&content) {
         Ok(c) => c,
-        Err(err) => bail!(ConfigurationFileError::UnableToScan(err)),
+        Err(err) => return Err(format!("{}", ConfigurationFileError::UnableToScan(err))),
     };
 
     parse_config(&config)
 }
 
-fn parse_config(config: &[Yaml]) -> anyhow::Result<Configuration> {
+fn parse_config(config: &[Yaml]) -> Result<Configuration, String> {
     let mut configuration = Configuration::default();
     for section in config[0].as_hash().unwrap().iter() {
         if section.0.as_str().unwrap() == "services" {
@@ -99,12 +104,12 @@ fn parse_config(config: &[Yaml]) -> anyhow::Result<Configuration> {
     Ok(configuration)
 }
 
-fn parse_notifications(yaml: &Yaml, config: &mut Configuration) -> anyhow::Result<()> {
+fn parse_notifications(yaml: &Yaml, config: &mut Configuration) -> Result<(), String> {
     config.mailer = parse_mailer(&yaml["mailer"])?;
     Ok(())
 }
 
-fn parse_mailer(mailer: &Yaml) -> anyhow::Result<Option<MailNotifier>> {
+fn parse_mailer(mailer: &Yaml) -> Result<Option<MailNotifier>, String> {
     if mailer.is_badvalue() {
         return Ok(None);
     }
@@ -112,12 +117,12 @@ fn parse_mailer(mailer: &Yaml) -> anyhow::Result<Option<MailNotifier>> {
     Ok(Some(MailNotifier::try_from(mailer)?))
 }
 
-fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Vec<Task>> {
+fn parse_services(section: &(&Yaml, &Yaml)) -> Result<Vec<Task>, String> {
     let mut tasks: Vec<_> = vec![];
 
     let services_map = match section.1.as_hash() {
         Some(map) => map,
-        None => bail!(ConfigurationParseError::NoServiceProvided),
+        None => return Err(format!("{}", ConfigurationParseError::NoServiceProvided)),
     };
     for service in services_map.iter() {
         let service_name = service.0.as_str().unwrap().to_string();
@@ -131,18 +136,20 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Vec<Task>> {
 
     Ok(tasks)
 }
-fn interval(service_attrs: &Yaml) -> anyhow::Result<SignedDuration> {
+fn interval(service_attrs: &Yaml) -> Result<SignedDuration, String> {
     match &service_attrs["interval"] {
-        Yaml::Integer(inter) if *inter > 0 => {
-            Ok(SignedDuration::from_secs(*inter))
-        },
-        _ => bail!("'interval' must be defined at service and be a number greater than zero.")
+        Yaml::Integer(inter) if *inter > 0 => Ok(SignedDuration::from_secs(*inter)),
+        _ => Err(String::from(
+            "'interval' is a mandatory map field for a service.",
+        )),
     }
 }
-fn get_checker(service_attrs: &Yaml) -> anyhow::Result<Checker> {
+fn get_checker(service_attrs: &Yaml) -> Result<Checker, String> {
     let service_config = &service_attrs["configuration"];
     if service_config.is_badvalue() {
-        bail!("'configuration' is a mandatory map field for a service.");
+        return Err(String::from(
+            "'configuration' is a mandatory map field for a service.",
+        ));
     }
 
     Checker::try_from(service_config)

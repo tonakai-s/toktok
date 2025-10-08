@@ -1,6 +1,5 @@
 use std::{fs, io::Read, path::PathBuf};
 
-use anyhow::{Result, bail};
 use lettre::{
     Address, Message, SmtpTransport, Transport,
     message::{Mailbox, header::ContentType},
@@ -9,9 +8,7 @@ use lettre::{
 use tracing::{Level, event, span};
 use yaml_rust2::Yaml;
 
-use crate::{
-    checker::structs::CheckerResult, configuration::ConfigurationParseError, notification::Notifier,
-};
+use crate::{checker::structs::CheckerResult, notification::Notifier};
 
 struct MailCredentials {
     user: String,
@@ -27,12 +24,12 @@ pub struct MailNotifier {
     _bcc: Option<String>,
 }
 impl MailNotifier {
-    fn new(
+    fn try_new(
         credentials: Option<MailCredentials>,
         domain: String,
         from: String,
         to: String,
-    ) -> Result<Self> {
+    ) -> Result<Self, String> {
         let mailer: SmtpTransport = if let Some(credentials) = credentials {
             SmtpTransport::relay(&domain)
                 .unwrap()
@@ -42,21 +39,23 @@ impl MailNotifier {
             SmtpTransport::builder_dangerous(&domain).build()
         };
 
-        let from_address = match from.parse::<Address>() {
-            Ok(addr) => addr,
-            Err(err) => bail!("Error parsing the 'from' mail address, double check it: {err}"),
-        };
-        let to_address = match to.parse::<Address>() {
-            Ok(addr) => addr,
-            Err(err) => bail!("Error parsing the 'to' mail address, double check it: {err}"),
-        };
-        let from = Mailbox::new(None, from_address);
-        let to = Mailbox::new(None, to_address);
+        let from_box = Mailbox::new(
+            None,
+            from.parse::<Address>().map_err(|e| {
+                format!("Error parsing the 'from' mail address, double check it: {e}")
+            })?,
+        );
+        let to_box = Mailbox::new(
+            None,
+            to.parse::<Address>().map_err(|e| {
+                format!("Error parsing the 'to' mail address, double check it: {e}")
+            })?,
+        );
 
         Ok(Self {
             mailer,
-            from,
-            to,
+            from: from_box,
+            to: to_box,
             _cc: None,
             _bcc: None,
         })
@@ -91,56 +90,42 @@ impl Notifier for MailNotifier {
     }
 }
 
-const AT_WHY_DEFAULT_ERROR_MESSAGE: &str = "at mailer notification";
 impl TryFrom<&Yaml> for MailNotifier {
-    type Error = anyhow::Error;
+    type Error = String;
     fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
-        let smtp_domain = &data["smtp_domain"];
-        if smtp_domain.is_badvalue() {
-            bail!(ConfigurationParseError::KeyNotFound(
-                "smtp_domain",
-                AT_WHY_DEFAULT_ERROR_MESSAGE
-            ));
-        }
+        let smtp_domain = match &data["smtp_domain"] {
+            Yaml::String(domain) => domain,
+            _ => return Err(String::from("Key 'smtp_domain' is mandatory for mailer")),
+        };
 
-        let from = &data["from"];
-        if smtp_domain.is_badvalue() {
-            bail!(ConfigurationParseError::KeyNotFound(
-                "from",
-                AT_WHY_DEFAULT_ERROR_MESSAGE
-            ));
-        }
+        let from = match &data["from"] {
+            Yaml::String(from) => from,
+            _ => return Err(String::from("Key 'from' is mandatory for mailer")),
+        };
 
-        let to = &data["from"];
-        if to.is_badvalue() {
-            bail!(ConfigurationParseError::KeyNotFound(
-                "to",
-                AT_WHY_DEFAULT_ERROR_MESSAGE
-            ));
-        }
+        let to = match &data["to"] {
+            Yaml::String(to) => to,
+            _ => return Err(String::from("Key 'to' is mandatory for mailer")),
+        };
 
         let credentials: Option<MailCredentials> = match &data["smtp_credentials"] {
             creds if !creds.is_badvalue() && creds.as_str().is_some() => {
                 let credentials_path = creds.as_str().unwrap();
                 let credentials_path = PathBuf::from(credentials_path);
                 if !credentials_path.exists() {
-                    bail!("Path in 'smtp_credentials' does not exists");
+                    return Err(String::from("Path in 'smtp_credentials' does not exists"));
                 }
 
-                let mut file = match fs::File::open(credentials_path) {
-                    Ok(f) => f,
-                    Err(err) => bail!("Unable to open the credentials file: {err}"),
-                };
+                let mut file = fs::File::open(credentials_path)
+                    .map_err(|e| format!("Unable to open the credentials file: {e}"))?;
+
                 let mut buff = String::new();
-                match file.read_to_string(&mut buff) {
-                    Ok(_) => (),
-                    Err(_) => {
-                        bail!("The credentials file must contain only valid UTF-8 characters")
-                    }
-                }
+                file.read_to_string(&mut buff).map_err(|e| {
+                    format!("The credentials file must contain only valid UTF-8 characters: {e}")
+                })?;
 
                 if buff.is_empty() {
-                    bail!("Mailer credentials file is empty")
+                    return Err(String::from("Mailer credentials file is empty"));
                 }
 
                 let mut buff_iter = buff.lines().take(2);
@@ -158,11 +143,6 @@ impl TryFrom<&Yaml> for MailNotifier {
             _ => None,
         };
 
-        MailNotifier::new(
-            credentials,
-            smtp_domain.as_str().unwrap().into(),
-            from.as_str().unwrap().into(),
-            to.as_str().unwrap().into(),
-        )
+        MailNotifier::try_new(credentials, smtp_domain.into(), from.into(), to.into())
     }
 }

@@ -4,7 +4,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Result, bail};
 use jiff::{Zoned, civil::Date};
 use tracing::{Level, event, span};
 
@@ -19,7 +18,7 @@ pub struct TaskLogger {
 }
 
 impl TaskLogger {
-    pub fn new(task_name: &str) -> Result<Self> {
+    pub fn try_new(task_name: &str) -> Result<Self, String> {
         let span = span!(Level::TRACE, "task_logger::new");
         let _enter = span.enter();
 
@@ -27,28 +26,24 @@ impl TaskLogger {
 
         let log_path = TaskLogger::folder(task_name);
         if !log_path.exists() {
-            match fs::create_dir_all(&log_path) {
-                Ok(_) => (),
-                Err(err) => {
-                    bail!("The program was unable to create the logs directory. Error: {err}")
-                }
-            }
+            fs::create_dir_all(&log_path).map_err(|e| {
+                format!("The program was unable to create the logs directory. Error: {e}")
+            })?;
         }
 
         let full_log_filepath = format!("{}{}", log_path.to_str().unwrap(), filename);
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists() {
-            if let Err(err) = fs::File::create(full_log_filepath) {
-                bail!("The program was unable to create the logs file. Error: {err}");
-            }
+            let _ = fs::File::create(full_log_filepath).map_err(|e| {
+                format!("The program was unable to create the logs file. Error: {e}")
+            })?;
         }
 
-        let file = match fs::OpenOptions::new().append(true).open(full_log_filepath) {
-            Ok(file) => file,
-            Err(err) => {
-                bail!("The program was unable to open the logs file. Error: {err}");
-            }
-        };
+        let file = fs::OpenOptions::new()
+            .append(true)
+            .open(full_log_filepath)
+            .map_err(|e| format!("The program was unable to open the logs file. Error: {e}"))?;
+
         Ok(Self {
             filename,
             file_dir: log_path,
@@ -112,17 +107,17 @@ impl TaskLogger {
             TaskLogger::todays_filename(&self.filename)
         );
         let full_log_filepath = Path::new(&full_log_filepath);
-        if !full_log_filepath.exists() {
-            if let Err(err) = fs::File::create(full_log_filepath) {
-                event!(
-                    Level::ERROR,
-                    error = %err,
-                    "Error updating the general task log file"
-                );
-                panic!(
-                    "Error updating the general task log file. For more info check the tracing file."
-                );
-            }
+        if !full_log_filepath.exists()
+            && let Err(err) = fs::File::create(full_log_filepath)
+        {
+            event!(
+                Level::ERROR,
+                error = %err,
+                "Error updating the general task log file"
+            );
+            panic!(
+                "Error updating the general task log file. For more info check the tracing file."
+            );
         }
 
         let file = match fs::File::open(full_log_filepath) {

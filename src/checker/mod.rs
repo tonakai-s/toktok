@@ -1,4 +1,5 @@
-use anyhow::bail;
+use std::time::Duration;
+
 use yaml_rust2::Yaml;
 
 pub mod server;
@@ -14,28 +15,38 @@ pub enum Checker {
     Server(ServerChecker),
 }
 
+impl Checker {
+    pub fn timeout(service_attrs: &Yaml) -> Result<Option<Duration>, String> {
+        match &service_attrs["timeout"] {
+            Yaml::Integer(time) if *time > 0 => {
+                let time_u64 = TryInto::<u64>::try_into(*time)
+                    .map_err(|e| format!("The timeout defined is not valid: {e}"))?;
+                Ok(Some(Duration::from_secs(time_u64)))
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
 impl TryFrom<&Yaml> for Checker {
-    type Error = anyhow::Error;
+    type Error = String;
 
     fn try_from(config: &Yaml) -> Result<Self, Self::Error> {
-        let service_type = &config["type"];
-        if service_type.is_badvalue() {
-            bail!("'type' is mandatory field for a service");
-        }
+        let service_type = match &config["type"] {
+            Yaml::String(serv_type) => serv_type,
+            _ => return Err(String::from("'type' field is mandatory")),
+        };
 
         match service_type.as_str() {
-            Some("web") => {
+            "web" => {
                 let web_checker = WebChecker::try_from(config)?;
                 Ok(Checker::Web(Box::new(web_checker)))
             }
-            Some("server") => {
+            "server" => {
                 let server_checker = ServerChecker::try_from(config)?;
                 Ok(Checker::Server(server_checker))
             }
-            _ => bail!(
-                "Type '{}' is not valid",
-                service_type.as_str().unwrap_or("undefined")
-            ),
+            _ => Err(format!("The type {} is not valid", service_type)),
         }
     }
 }

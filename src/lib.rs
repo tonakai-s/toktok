@@ -1,3 +1,4 @@
+pub mod args;
 pub mod checker;
 pub mod configuration;
 pub mod executor;
@@ -7,4 +8,3 @@ pub mod scheduler;
 pub mod task;
 pub mod task_info;
 pub mod task_logger;
-pub mod args;

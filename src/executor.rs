@@ -21,15 +21,15 @@ pub async fn execute_check(
         Checker::Server(checker) => checker.check(&task.name()).await,
     };
     task.log(&checker_result);
-    if checker_result.status != CheckerStatus::Success {
-        if let Err(err) = tx_notifier.send(checker_result) {
-            event!(
-                Level::ERROR,
-                message = ?err.0,
-                error = %err,
-                "Error sending the checker result to notifier thread"
-            );
-        }
+    if checker_result.status != CheckerStatus::Success
+        && let Err(err) = tx_notifier.send(checker_result)
+    {
+        event!(
+            Level::ERROR,
+            message = ?err.0,
+            error = %err,
+            "Error sending the checker result to notifier thread"
+        );
     }
     if let Err(err) = tx_task.send(task) {
         event!(

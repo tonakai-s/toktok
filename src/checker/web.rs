@@ -1,16 +1,12 @@
 use std::str::FromStr;
 
-use anyhow::bail;
 use reqwest::{
     Client, RequestBuilder, StatusCode,
     header::{HeaderMap, HeaderName, HeaderValue},
 };
 use yaml_rust2::Yaml;
 
-use crate::{
-    checker::structs::{CheckerResult, CheckerStatus},
-    configuration::ConfigurationParseError,
-};
+use crate::checker::structs::{CheckerResult, CheckerStatus};
 
 #[derive(Debug)]
 pub struct WebChecker {
@@ -60,34 +56,25 @@ impl WebChecker {
 }
 
 impl TryFrom<&Yaml> for WebChecker {
-    type Error = anyhow::Error;
+    type Error = String;
     fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
         let url = match &data["url"] {
             Yaml::String(d) if !d.is_empty() => d.clone(),
-            _ => bail!(ConfigurationParseError::KeyNotFound(
-                "url",
-                "at service of type web and cannot be empty"
-            )),
+            _ => {
+                return Err(String::from(
+                    "Key 'url' is mandatory for service of type web",
+                ));
+            }
         };
 
-        let expected_code = match data["expected_http_code"] {
+        let expected_http_code = match data["expected_http_code"] {
             Yaml::Integer(http_code)
                 if http_code >= u16::MIN as i64 && http_code <= u16::MAX as i64 =>
             {
-                http_code as u16
+                StatusCode::from_u16(http_code as u16)
+                    .map_err(|_| format!("{} is not a valid HTTP code", http_code))?
             }
-            _ => bail!(ConfigurationParseError::KeyNotFound(
-                "expected_http_code",
-                "at service of type web and be a valid HTTP code"
-            )),
-        };
-
-        let http_code = match StatusCode::from_u16(expected_code) {
-            Ok(code) => code,
-            Err(_) => bail!(ConfigurationParseError::KeyNotFound(
-                "expected_http_code",
-                "at service of type web and be a valid HTTP code"
-            )),
+            _ => return Err(String::from("Invalid ''")),
         };
 
         let headers = match &data["headers"] {
@@ -113,6 +100,6 @@ impl TryFrom<&Yaml> for WebChecker {
             _ => None,
         };
 
-        Ok(WebChecker::new(url, http_code, headers))
+        Ok(WebChecker::new(url, expected_http_code, headers))
     }
 }

@@ -15,6 +15,15 @@ services:
       expected_http_code: 200
       headers:
         Content-type: 'application/json'
+  api.auth.apikey:
+    interval: 10
+    timeout: 10
+    configuration:
+      type: web
+      web: 'https://mydomain.com.br/api/foo'
+      headers:
+        ApiKey: 'foobarbaz'
+      expected_http_code: 200
   server.internal.tcp:
     interval: 10
     configuration:

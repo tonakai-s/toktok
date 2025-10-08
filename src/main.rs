@@ -9,11 +9,6 @@ async fn main() {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    event!(
-        Level::INFO,
-        temp_dir_path = std::env::temp_dir().to_str().unwrap()
-    );
-
     let config = match load_config(&args) {
         Ok(s) => s,
         Err(err) => {
@@ -25,6 +20,11 @@ async fn main() {
         println!("None services found to monitor, shutting down");
         exit(0);
     }
+
+    event!(
+        Level::INFO,
+        temp_dir_path = std::env::temp_dir().to_str().unwrap()
+    );
 
     let mut notifiers: Vec<_> = vec![];
     if let Some(mailer) = &config.mailer {

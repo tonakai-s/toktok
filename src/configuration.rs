@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    io::{self, Read},
+    io::{self, Read}
 };
 
 use anyhow::bail;
@@ -132,30 +132,18 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> anyhow::Result<Vec<Task>> {
     Ok(tasks)
 }
 fn interval(service_attrs: &Yaml) -> anyhow::Result<SignedDuration> {
-    let interval_value = &service_attrs["interval"];
-    if interval_value.is_badvalue() {
-        bail!("'interval' is mandatory field for a service.");
-    }
-
-    match interval_value.as_i64() {
-        Some(interval) => {
-            if interval < 0 {
-                bail!("Interval must be grater than 0")
-            } else {
-                Ok(SignedDuration::from_secs(interval))
-            }
-        }
-        None => bail!("'interval' must be a number."),
+    match &service_attrs["interval"] {
+        Yaml::Integer(inter) if *inter > 0 => {
+            Ok(SignedDuration::from_secs(*inter))
+        },
+        _ => bail!("'interval' must be defined at service and be a number greater than zero.")
     }
 }
 fn get_checker(service_attrs: &Yaml) -> anyhow::Result<Checker> {
     let service_config = &service_attrs["configuration"];
     if service_config.is_badvalue() {
-        bail!("'configuration' is mandatory map field for a service.");
+        bail!("'configuration' is a mandatory map field for a service.");
     }
-    if service_config.as_hash().is_none() {
-        bail!("'configuration' is not valid map.");
-    };
 
     Checker::try_from(service_config)
 }

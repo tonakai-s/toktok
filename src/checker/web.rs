@@ -72,7 +72,7 @@ impl TryFrom<&Yaml> for WebChecker {
                 if http_code >= u16::MIN as i64 && http_code <= u16::MAX as i64 =>
             {
                 StatusCode::from_u16(http_code as u16)
-                    .map_err(|_| format!("{} is not a valid HTTP code", http_code))?
+                    .map_err(|_| format!("{http_code} is not a valid HTTP code"))?
             }
             _ => return Err(String::from("Invalid ''")),
         };

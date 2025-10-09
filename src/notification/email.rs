@@ -2,7 +2,7 @@ use std::{fs, io::Read, path::PathBuf};
 
 use lettre::{
     Address, Message, SmtpTransport, Transport,
-    message::{Mailbox, header::ContentType},
+    message::{Mailbox, MessageBuilder, header::ContentType},
     transport::smtp::authentication::Credentials,
 };
 use tracing::{Level, event, span};
@@ -18,10 +18,7 @@ struct MailCredentials {
 #[derive(Debug, Clone)]
 pub struct MailNotifier {
     mailer: SmtpTransport,
-    from: Mailbox,
-    to: Mailbox,
-    _cc: Option<String>,
-    _bcc: Option<String>,
+    base_msg_builder: MessageBuilder,
 }
 impl MailNotifier {
     fn try_new(
@@ -29,10 +26,16 @@ impl MailNotifier {
         domain: String,
         from: String,
         to: String,
+        cc: Option<Vec<String>>,
+        bcc: Option<Vec<String>>,
     ) -> Result<Self, String> {
         let mailer: SmtpTransport = if let Some(credentials) = credentials {
             SmtpTransport::relay(&domain)
-                .unwrap()
+                .map_err(|e| {
+                    format!(
+                        "The program was unable to build a SMTP relay with the provided domain: {e}"
+                    )
+                })?
                 .credentials(Credentials::new(credentials.user, credentials.pass))
                 .build()
         } else {
@@ -52,12 +55,55 @@ impl MailNotifier {
             })?,
         );
 
+        let mut base_msg_builder = Message::builder()
+            .from(from_box)
+            .to(to_box)
+            .subject("Toktok Service Alert!")
+            .header(ContentType::TEXT_PLAIN);
+
+        let cc_boxes = cc.and_then(|addrs| {
+            addrs
+                .iter()
+                .map(|addr| {
+                    Ok(Mailbox::new(
+                        None,
+                        addr.parse::<Address>().map_err(|e| {
+                            format!("The email address {addr} at cc list is not valid: {e}")
+                        })?,
+                    ))
+                })
+                .collect::<Result<Vec<Mailbox>, String>>()
+                .ok()
+        });
+        if let Some(boxes) = cc_boxes {
+            for mbox in boxes.into_iter() {
+                base_msg_builder = base_msg_builder.cc(mbox);
+            }
+        }
+
+        let bcc_boxes = bcc.and_then(|addrs| {
+            addrs
+                .iter()
+                .map(|addr| {
+                    Ok(Mailbox::new(
+                        None,
+                        addr.parse::<Address>().map_err(|e| {
+                            format!("The email address {addr} at bcc list is not valid: {e}")
+                        })?,
+                    ))
+                })
+                .collect::<Result<Vec<Mailbox>, String>>()
+                .ok()
+        });
+        if let Some(boxes) = bcc_boxes {
+            for mbox in boxes.into_iter() {
+                base_msg_builder = base_msg_builder.bcc(mbox);
+            }
+        }
+
         Ok(Self {
             mailer,
-            from: from_box,
-            to: to_box,
-            _cc: None,
-            _bcc: None,
+            base_msg_builder,
         })
     }
 }
@@ -71,15 +117,13 @@ impl Notifier for MailNotifier {
             "Hello, the service {} reported with status '{}' in the last verification: {}",
             exec_result.service_name, exec_result.status, exec_result.message
         );
-        let email = Message::builder()
-            .from(self.from.clone())
-            .to(self.to.clone())
-            .subject("Toktok Service Alert!")
-            .header(ContentType::TEXT_PLAIN)
-            .body(body)
-            .unwrap();
+        let email = self.base_msg_builder.clone().body(body);
+        if let Err(e) = email {
+            event!(Level::ERROR, error = %e, "Error building the email message");
+            return;
+        }
 
-        match self.mailer.send(&email) {
+        match self.mailer.send(&email.unwrap()) {
             Ok(_) => event!(Level::INFO, "Email notification sent successfully"),
             Err(err) => event!(
                 Level::ERROR,
@@ -106,6 +150,25 @@ impl TryFrom<&Yaml> for MailNotifier {
         let to = match &data["to"] {
             Yaml::String(to) => to,
             _ => return Err(String::from("Key 'to' is mandatory for mailer")),
+        };
+
+        let cc: Option<Vec<String>> = match &data["cc"] {
+            Yaml::String(cc_list) if !cc_list.is_empty() => Some(
+                cc_list
+                    .split(',')
+                    .map(|addr| addr.trim().to_string())
+                    .collect(),
+            ),
+            _ => None,
+        };
+        let bcc: Option<Vec<String>> = match &data["bcc"] {
+            Yaml::String(bcc_list) if !bcc_list.is_empty() => Some(
+                bcc_list
+                    .split(',')
+                    .map(|addr| addr.trim().to_string())
+                    .collect(),
+            ),
+            _ => None,
         };
 
         let credentials: Option<MailCredentials> = match &data["smtp_credentials"] {
@@ -143,6 +206,13 @@ impl TryFrom<&Yaml> for MailNotifier {
             _ => None,
         };
 
-        MailNotifier::try_new(credentials, smtp_domain.into(), from.into(), to.into())
+        MailNotifier::try_new(
+            credentials,
+            smtp_domain.into(),
+            from.into(),
+            to.into(),
+            cc,
+            bcc,
+        )
     }
 }

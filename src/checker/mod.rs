@@ -46,7 +46,7 @@ impl TryFrom<&Yaml> for Checker {
                 let server_checker = ServerChecker::try_from(config)?;
                 Ok(Checker::Server(server_checker))
             }
-            _ => Err(format!("The type {} is not valid", service_type)),
+            _ => Err(format!("The type {service_type} is not valid")),
         }
     }
 }

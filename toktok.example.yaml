@@ -24,11 +24,17 @@ services:
       headers:
         ApiKey: 'foobarbaz'
       expected_http_code: 200
-  server.internal.tcp:
+  server.internal.tcp.addr:
     interval: 10
     configuration:
       type: server
       socket: 127.0.0.1:22
+      timeout: 10
+  server.internal.tcp.dns:
+    interval: 10
+    configuration:
+      type: server
+      socket: localhost:22
       timeout: 10
 
 notification:

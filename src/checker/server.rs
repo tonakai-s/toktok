@@ -1,5 +1,5 @@
 use std::{
-    net::{SocketAddr, TcpStream},
+    net::{IpAddr, SocketAddr, TcpStream, ToSocketAddrs},
     str::FromStr,
     time::Duration,
 };
@@ -55,16 +55,26 @@ impl TryFrom<&Yaml> for ServerChecker {
             }
         };
 
-        let socket_split = socket.split(':').collect::<Vec<&str>>();
-        if socket_split.is_empty() {
+        let socket_split = socket.split_once(':');
+        if socket_split.is_none() {
             return Err(String::from(
                 "Key 'socket' must follow the pattern HOST:PORT",
             ));
         }
 
+        let addr = socket_split.unwrap().0;
+        let socket_addr = if addr.parse::<IpAddr>().is_ok() {
+            SocketAddr::from_str(socket).map_err(|e| format!("Invalid socket: {e}"))?
+        } else {
+            let ip_addrs = socket.to_socket_addrs().map_err(|e| {
+                format!("Unable to convert the socket to a Address due to the following error: {e}")
+            })?;
+            match ip_addrs.collect::<Vec<SocketAddr>>().first() {
+                Some(s_addr) => *s_addr,
+                None => return Err("No IP resolution found to the socket".to_string()),
+            }
+        };
         let timeout = Checker::timeout(data)?;
-        let socket_addr =
-            SocketAddr::from_str(socket).map_err(|e| format!("Invalid socket: {e}"))?;
 
         Ok(ServerChecker::new(socket_addr, timeout))
     }

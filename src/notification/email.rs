@@ -62,8 +62,8 @@ impl MailNotifier {
             .header(ContentType::TEXT_PLAIN);
 
         let cc_boxes = match cc {
-            Some(addrs) => {
-                Some(addrs
+            Some(addrs) => Some(
+                addrs
                     .iter()
                     .map(|addr| {
                         Ok(Mailbox::new(
@@ -73,9 +73,9 @@ impl MailNotifier {
                             })?,
                         ))
                     })
-                    .collect::<Result<Vec<Mailbox>, String>>()?)
-            },
-            None => None
+                    .collect::<Result<Vec<Mailbox>, String>>()?,
+            ),
+            None => None,
         };
         if let Some(boxes) = cc_boxes {
             for mbox in boxes.into_iter() {
@@ -84,8 +84,8 @@ impl MailNotifier {
         }
 
         let bcc_boxes = match bcc {
-            Some(addrs) => {
-                Some(addrs
+            Some(addrs) => Some(
+                addrs
                     .iter()
                     .map(|addr| {
                         Ok(Mailbox::new(
@@ -95,9 +95,9 @@ impl MailNotifier {
                             })?,
                         ))
                     })
-                    .collect::<Result<Vec<Mailbox>, String>>()?)
-            },
-            None => None
+                    .collect::<Result<Vec<Mailbox>, String>>()?,
+            ),
+            None => None,
         };
         if let Some(boxes) = bcc_boxes {
             for mbox in boxes.into_iter() {

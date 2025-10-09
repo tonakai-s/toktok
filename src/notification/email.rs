@@ -61,40 +61,44 @@ impl MailNotifier {
             .subject("Toktok Service Alert!")
             .header(ContentType::TEXT_PLAIN);
 
-        let cc_boxes = cc.and_then(|addrs| {
-            addrs
-                .iter()
-                .map(|addr| {
-                    Ok(Mailbox::new(
-                        None,
-                        addr.parse::<Address>().map_err(|e| {
-                            format!("The email address {addr} at cc list is not valid: {e}")
-                        })?,
-                    ))
-                })
-                .collect::<Result<Vec<Mailbox>, String>>()
-                .ok()
-        });
+        let cc_boxes = match cc {
+            Some(addrs) => {
+                Some(addrs
+                    .iter()
+                    .map(|addr| {
+                        Ok(Mailbox::new(
+                            None,
+                            addr.parse::<Address>().map_err(|e| {
+                                format!("The email address '{addr}' at cc list is not valid: {e}")
+                            })?,
+                        ))
+                    })
+                    .collect::<Result<Vec<Mailbox>, String>>()?)
+            },
+            None => None
+        };
         if let Some(boxes) = cc_boxes {
             for mbox in boxes.into_iter() {
                 base_msg_builder = base_msg_builder.cc(mbox);
             }
         }
 
-        let bcc_boxes = bcc.and_then(|addrs| {
-            addrs
-                .iter()
-                .map(|addr| {
-                    Ok(Mailbox::new(
-                        None,
-                        addr.parse::<Address>().map_err(|e| {
-                            format!("The email address {addr} at bcc list is not valid: {e}")
-                        })?,
-                    ))
-                })
-                .collect::<Result<Vec<Mailbox>, String>>()
-                .ok()
-        });
+        let bcc_boxes = match bcc {
+            Some(addrs) => {
+                Some(addrs
+                    .iter()
+                    .map(|addr| {
+                        Ok(Mailbox::new(
+                            None,
+                            addr.parse::<Address>().map_err(|e| {
+                                format!("The email address '{addr}' at bcc list is not valid: {e}")
+                            })?,
+                        ))
+                    })
+                    .collect::<Result<Vec<Mailbox>, String>>()?)
+            },
+            None => None
+        };
         if let Some(boxes) = bcc_boxes {
             for mbox in boxes.into_iter() {
                 base_msg_builder = base_msg_builder.bcc(mbox);

@@ -59,7 +59,7 @@ impl MailNotifier {
             .from(from_box)
             .to(to_box)
             .subject("Toktok Service Alert!")
-            .header(ContentType::TEXT_PLAIN);
+            .header(ContentType::TEXT_HTML);
 
         let cc_boxes = match cc {
             Some(addrs) => Some(
@@ -117,10 +117,25 @@ impl Notifier for MailNotifier {
         let span = span!(Level::INFO, "MailNotifier::notify");
         let _enter = span.enter();
 
-        let body = format!(
-            "Hello, the service {} reported with status '{}' in the last verification: {}",
-            exec_result.service_name, exec_result.status, exec_result.message
-        );
+        let body = format!(r#"
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      p {}
+    </style>
+  </head>
+  <body>
+    <h1>Toktok!</h1>
+    <p>Hello, a service reported with a unexpected status through the last verification</p>
+    <p>Service: {}</p>
+    <p>Reported status: {}</p>
+    <p>Message: {}</p>
+  </body>
+</html>
+"#, "{margin: .5em 0 .5em 0; font-size: 16px;}", exec_result.service_name, exec_result.status, exec_result.message);
+        println!("Body: {}", body);
+
         let email = self.base_msg_builder.clone().body(body);
         if let Err(e) = email {
             event!(Level::ERROR, error = %e, "Error building the email message");

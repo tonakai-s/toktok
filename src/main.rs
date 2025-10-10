@@ -12,7 +12,7 @@ async fn main() {
     let config = match load_config(&args) {
         Ok(s) => s,
         Err(err) => {
-            eprintln!("The program found an error during the configuration parse:\n{err}");
+            eprintln!("\x1b[31merror: \x1b[0mIncorrect data found in configuration\n\n{err}");
             exit(1);
         }
     };

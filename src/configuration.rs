@@ -14,21 +14,21 @@ use crate::{
 const DEFAULT_CONFIG_FILE: &str = "toktok.yaml";
 
 #[derive(Debug)]
-pub enum ConfigurationFileError {
+pub enum ConfigFileError {
     UnableToOpen(io::Error),
     UnableToRead(io::Error),
     UnableToScan(ScanError),
 }
-impl Display for ConfigurationFileError {
+impl Display for ConfigFileError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigurationFileError::UnableToOpen(err) => {
+            ConfigFileError::UnableToOpen(err) => {
                 write!(f, "Error trying to open the config file: {err}")
             }
-            ConfigurationFileError::UnableToRead(err) => {
+            ConfigFileError::UnableToRead(err) => {
                 write!(f, "Error trying to read the config file: {err}")
             }
-            ConfigurationFileError::UnableToScan(err) => write!(
+            ConfigFileError::UnableToScan(err) => write!(
                 f,
                 "Error interpreting the basic structure of config file: {err}"
             ),
@@ -76,15 +76,15 @@ pub fn load_config(args: &Args) -> Result<Configuration, String> {
 
     let mut file = match std::fs::File::open(config_path) {
         Ok(f) => f,
-        Err(err) => return Err(format!("{}", ConfigurationFileError::UnableToOpen(err))),
+        Err(err) => return Err(format!("{}", ConfigFileError::UnableToOpen(err))),
     };
     match file.read_to_string(&mut content) {
         Ok(_) => {}
-        Err(err) => return Err(format!("{}", ConfigurationFileError::UnableToRead(err))),
+        Err(err) => return Err(format!("{}", ConfigFileError::UnableToRead(err))),
     };
     let config = match YamlLoader::load_from_str(&content) {
         Ok(c) => c,
-        Err(err) => return Err(format!("{}", ConfigurationFileError::UnableToScan(err))),
+        Err(err) => return Err(format!("{}", ConfigFileError::UnableToScan(err))),
     };
 
     parse_config(&config)
@@ -111,7 +111,7 @@ fn parse_notifications(yaml: &Yaml, config: &mut Configuration) -> Result<(), St
 
 fn parse_mailer(mailer: &Yaml) -> Result<Option<MailNotifier>, String> {
     if mailer.is_badvalue() {
-        return Ok(None);
+        return Ok(None)
     }
 
     Ok(Some(MailNotifier::try_from(mailer)?))
@@ -127,9 +127,11 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> Result<Vec<Task>, String> {
     for service in services_map.iter() {
         let service_name = service.0.as_str().unwrap().to_string();
 
-        let interval = interval(service.1)?;
+        let interval =
+            interval(service.1).map_err(|e| format!("{e}\nThrowed when reading service: {service_name}"))?;
+        let checker =
+            get_checker(service.1).map_err(|e| format!("{e}\nThrowed when reading service: {service_name}"))?;
         let info = TaskInfo::new(service_name, interval);
-        let checker = get_checker(service.1)?;
 
         tasks.push(Task::new(info, checker));
     }

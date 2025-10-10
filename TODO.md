@@ -4,3 +4,4 @@
 [ ] Create a CI/CD with GH Actions
 [ ] Define a folder for general logs in windows and linux
 [ ] Define how to deploy/distribute this software
+[ ] CheckerResult implement Debug with a custom format

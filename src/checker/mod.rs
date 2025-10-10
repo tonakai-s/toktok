@@ -20,7 +20,7 @@ impl Checker {
         match &service_attrs["timeout"] {
             Yaml::Integer(time) if *time > 0 => {
                 let time_u64 = TryInto::<u64>::try_into(*time)
-                    .map_err(|e| format!("The timeout defined is not valid: {e}"))?;
+                    .map_err(|e| format!("The defined timeout is not valid: {e}"))?;
                 Ok(Some(Duration::from_secs(time_u64)))
             }
             _ => Ok(None),

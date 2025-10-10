@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{str::FromStr, time::Duration};
 
 use reqwest::{
     Client, RequestBuilder, StatusCode,
@@ -6,7 +6,7 @@ use reqwest::{
 };
 use yaml_rust2::Yaml;
 
-use crate::checker::structs::{CheckerResult, CheckerStatus};
+use crate::checker::{structs::{CheckerResult, CheckerStatus}, Checker};
 
 #[derive(Debug)]
 pub struct WebChecker {
@@ -15,8 +15,11 @@ pub struct WebChecker {
 }
 
 impl WebChecker {
-    pub fn new(url: String, expected_code: StatusCode, headers: Option<HeaderMap>) -> Self {
-        let client = Client::new().get(url).headers(headers.unwrap_or_default());
+    pub fn new(url: String, expected_code: StatusCode, headers: Option<HeaderMap>, timeout: Option<Duration>) -> Self {
+        let mut client = Client::new().get(url).headers(headers.unwrap_or_default());
+        if let Some(t) = timeout {
+            client = client.timeout(t);
+        }
 
         Self {
             req_builder: client,
@@ -77,6 +80,8 @@ impl TryFrom<&Yaml> for WebChecker {
             _ => return Err(String::from("Invalid ''")),
         };
 
+        let timeout = Checker::timeout(data)?;
+
         let headers = match &data["headers"] {
             Yaml::Hash(headers) => {
                 let mut header_map = HeaderMap::new();
@@ -100,6 +105,6 @@ impl TryFrom<&Yaml> for WebChecker {
             _ => None,
         };
 
-        Ok(WebChecker::new(url, expected_http_code, headers))
+        Ok(WebChecker::new(url, expected_http_code, headers, timeout))
     }
 }

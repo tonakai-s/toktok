@@ -117,7 +117,8 @@ impl Notifier for MailNotifier {
         let span = span!(Level::INFO, "MailNotifier::notify");
         let _enter = span.enter();
 
-        let body = format!(r#"
+        let body = format!(
+            r#"
 <!DOCTYPE html>
 <html>
   <head>
@@ -133,8 +134,12 @@ impl Notifier for MailNotifier {
     <p>Message: {}</p>
   </body>
 </html>
-"#, "{margin: .5em 0 .5em 0; font-size: 16px;}", exec_result.service_name, exec_result.status, exec_result.message);
-        println!("Body: {}", body);
+"#,
+            "{margin: .5em 0 .5em 0; font-size: 16px;}",
+            exec_result.service_name,
+            exec_result.status,
+            exec_result.message
+        );
 
         let email = self.base_msg_builder.clone().body(body);
         if let Err(e) = email {

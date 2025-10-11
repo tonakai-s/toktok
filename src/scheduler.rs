@@ -8,14 +8,16 @@ use jiff::Zoned;
 use tracing::{Level, event};
 
 use crate::{
-    checker::structs::CheckerResult, configuration::Configuration, executor,
-    notification::Notifier, queue::PriorityQueue, task::Task,
+    checker::structs::CheckerResult, executor, notification::Notifier, parser::Configuration,
+    queue::PriorityQueue, task::Task,
 };
 
 #[derive(Debug)]
 pub struct Scheduler {
     tasks: Arc<Mutex<PriorityQueue>>,
 }
+
+pub struct SchedulerBuilder {}
 
 impl Scheduler {
     pub fn new(config: Configuration) -> Self {
@@ -30,7 +32,7 @@ impl Scheduler {
         Self { tasks: queue }
     }
 
-    pub async fn start(&self, notifiers: Vec<impl Notifier + Send + 'static>) {
+    pub async fn init(&self, notifiers: Vec<impl Notifier + Send + 'static>) {
         event!(
             Level::INFO,
             notifiers_count = notifiers.len(),

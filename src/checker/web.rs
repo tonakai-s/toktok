@@ -6,7 +6,45 @@ use reqwest::{
 };
 use yaml_rust2::Yaml;
 
-use crate::checker::{structs::{CheckerResult, CheckerStatus}, Checker};
+use crate::{
+    checker::{
+        Checker,
+        structs::{CheckerParserError, CheckerResult, CheckerStatus, CheckerType},
+    },
+    parser::{ConfigKey, keys::ConfigKeyInvalidFormat},
+};
+
+#[derive(Debug)]
+pub struct WebCheckerBuilder {
+    req_builder: RequestBuilder,
+    expected_code: StatusCode,
+}
+
+impl WebCheckerBuilder {
+    fn new(url: &str, expected_code: StatusCode) -> Self {
+        Self {
+            req_builder: Client::new().get(url),
+            expected_code,
+        }
+    }
+
+    fn headers(mut self, headers: HeaderMap) -> Self {
+        self.req_builder = self.req_builder.headers(headers);
+        self
+    }
+
+    fn timeout(mut self, timeout: Duration) -> Self {
+        self.req_builder = self.req_builder.timeout(timeout);
+        self
+    }
+
+    fn build(self) -> WebChecker {
+        WebChecker {
+            req_builder: self.req_builder,
+            expected_code: self.expected_code,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct WebChecker {
@@ -15,16 +53,8 @@ pub struct WebChecker {
 }
 
 impl WebChecker {
-    pub fn new(url: String, expected_code: StatusCode, headers: Option<HeaderMap>, timeout: Option<Duration>) -> Self {
-        let mut client = Client::new().get(url).headers(headers.unwrap_or_default());
-        if let Some(t) = timeout {
-            client = client.timeout(t);
-        }
-
-        Self {
-            req_builder: client,
-            expected_code,
-        }
+    pub fn builder(url: &str, expected_code: StatusCode) -> WebCheckerBuilder {
+        WebCheckerBuilder::new(url, expected_code)
     }
 
     pub fn expected_code(&self) -> &StatusCode {
@@ -59,28 +89,42 @@ impl WebChecker {
 }
 
 impl TryFrom<&Yaml> for WebChecker {
-    type Error = String;
+    type Error = CheckerParserError;
     fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
-        let url = match &data["url"] {
-            Yaml::String(d) if !d.is_empty() => d.clone(),
+        let url = match &data[ConfigKey::Url.as_ref()] {
+            Yaml::String(d) if !d.is_empty() => d,
             _ => {
-                return Err(String::from(
-                    "Key 'url' is mandatory for service of type web",
+                return Err(CheckerParserError::KeyNotFoundAt(
+                    ConfigKey::Url,
+                    CheckerType::Web,
                 ));
             }
         };
 
-        let expected_http_code = match data["expected_http_code"] {
+        let expected_http_code = match data[ConfigKey::ExpectedHttpCode.as_ref()] {
             Yaml::Integer(http_code)
                 if http_code >= u16::MIN as i64 && http_code <= u16::MAX as i64 =>
             {
-                StatusCode::from_u16(http_code as u16)
-                    .map_err(|_| format!("{http_code} is not a valid HTTP code"))?
+                StatusCode::from_u16(http_code as u16).map_err(|_| {
+                    CheckerParserError::InvalidFormat(
+                        ConfigKey::ExpectedHttpCode,
+                        ConfigKeyInvalidFormat::new(ConfigKey::ExpectedHttpCode),
+                    )
+                })?
             }
-            _ => return Err(String::from("Invalid ''")),
+            _ => {
+                return Err(CheckerParserError::InvalidFormat(
+                    ConfigKey::ExpectedHttpCode,
+                    ConfigKeyInvalidFormat::new(ConfigKey::ExpectedHttpCode),
+                ));
+            }
         };
 
-        let timeout = Checker::timeout(data)?;
+        let mut web_checker = WebChecker::builder(url, expected_http_code);
+
+        if let Some(timeout) = Checker::timeout(data)? {
+            web_checker = web_checker.timeout(timeout);
+        }
 
         let headers = match &data["headers"] {
             Yaml::Hash(headers) => {
@@ -105,6 +149,10 @@ impl TryFrom<&Yaml> for WebChecker {
             _ => None,
         };
 
-        Ok(WebChecker::new(url, expected_http_code, headers, timeout))
+        if let Some(headers) = headers {
+            web_checker = web_checker.headers(headers);
+        }
+
+        Ok(web_checker.build())
     }
 }

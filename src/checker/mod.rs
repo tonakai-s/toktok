@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use yaml_rust2::Yaml;
 
@@ -9,6 +9,11 @@ pub mod web;
 pub use server::ServerChecker;
 pub use web::WebChecker;
 
+use crate::{
+    checker::structs::{CheckerParserError, CheckerType},
+    parser::{ConfigKey, keys::ConfigKeyInvalidFormat},
+};
+
 #[derive(Debug)]
 pub enum Checker {
     Web(Box<WebChecker>),
@@ -16,11 +21,15 @@ pub enum Checker {
 }
 
 impl Checker {
-    pub fn timeout(service_attrs: &Yaml) -> Result<Option<Duration>, String> {
-        match &service_attrs["timeout"] {
+    pub fn timeout(service_attrs: &Yaml) -> Result<Option<Duration>, CheckerParserError> {
+        match &service_attrs[ConfigKey::Timeout.as_ref()] {
             Yaml::Integer(time) if *time > 0 => {
-                let time_u64 = TryInto::<u64>::try_into(*time)
-                    .map_err(|e| format!("The defined timeout is not valid: {e}"))?;
+                let time_u64 = TryInto::<u64>::try_into(*time).map_err(|_| {
+                    CheckerParserError::InvalidFormat(
+                        ConfigKey::Timeout,
+                        ConfigKeyInvalidFormat::new(ConfigKey::Timeout),
+                    )
+                })?;
                 Ok(Some(Duration::from_secs(time_u64)))
             }
             _ => Ok(None),
@@ -29,24 +38,25 @@ impl Checker {
 }
 
 impl TryFrom<&Yaml> for Checker {
-    type Error = String;
+    type Error = CheckerParserError;
 
     fn try_from(config: &Yaml) -> Result<Self, Self::Error> {
-        let service_type = match &config["type"] {
-            Yaml::String(serv_type) => serv_type,
-            _ => return Err(String::from("'type' field is mandatory")),
+        let service_type = match &config[ConfigKey::Type.as_ref()] {
+            Yaml::String(serv_type) => {
+                CheckerType::from_str(serv_type).map_err(CheckerParserError::InternalParse)?
+            }
+            _ => return Err(CheckerParserError::KeyNotFound(ConfigKey::Type)),
         };
 
-        match service_type.as_str() {
-            "web" => {
+        match service_type {
+            CheckerType::Web => {
                 let web_checker = WebChecker::try_from(config)?;
                 Ok(Checker::Web(Box::new(web_checker)))
             }
-            "server" => {
+            CheckerType::Server => {
                 let server_checker = ServerChecker::try_from(config)?;
                 Ok(Checker::Server(server_checker))
             }
-            _ => Err(format!("The type {service_type} is not valid")),
         }
     }
 }

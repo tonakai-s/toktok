@@ -1,4 +1,29 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
+
+use crate::parser::{ConfigKey, keys::ConfigKeyInvalidFormat};
+
+pub enum CheckerType {
+    Web,
+    Server,
+}
+impl Display for CheckerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CheckerType::Web => write!(f, "web"),
+            CheckerType::Server => write!(f, "server"),
+        }
+    }
+}
+impl FromStr for CheckerType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "web" => Ok(CheckerType::Web),
+            "server" => Ok(CheckerType::Server),
+            _ => Err(format!("Is not a valid type: {s}")),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum CheckerStatus {
@@ -37,5 +62,28 @@ impl Display for CheckerResult {
             "Service: {} - Status: {} - Message: {}",
             self.service_name, self.status, self.message
         )
+    }
+}
+
+pub enum CheckerParserError {
+    KeyNotFoundAt(ConfigKey, CheckerType),
+    KeyNotFound(ConfigKey),
+    InvalidType(String),
+    InvalidFormat(ConfigKey, ConfigKeyInvalidFormat),
+    InternalParse(String),
+}
+impl Display for CheckerParserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CheckerParserError::KeyNotFoundAt(key, c_type) => {
+                write!(f, "Key {key} is mandatory for a service of type {c_type}.")
+            }
+            CheckerParserError::KeyNotFound(key) => write!(f, "Key '{key}' is mandatory."),
+            CheckerParserError::InvalidType(t) => write!(f, "Invalid type informed: {t}."),
+            CheckerParserError::InvalidFormat(key, format) => {
+                write!(f, "Invalid format for '{key}'. Expected: {format}")
+            }
+            CheckerParserError::InternalParse(e) => write!(f, "{e}"),
+        }
     }
 }

@@ -1,8 +1,8 @@
 pub mod args;
 pub mod checker;
-pub mod configuration;
 pub mod executor;
 pub mod notification;
+pub mod parser;
 pub mod queue;
 pub mod scheduler;
 pub mod task;

@@ -7,7 +7,11 @@ use jiff::SignedDuration;
 use yaml_rust2::{ScanError, Yaml, YamlLoader};
 
 use crate::{
-    args::Args, checker::Checker, notification::email::MailNotifier, task::Task,
+    args::Args,
+    checker::{Checker, structs::CheckerParserError},
+    notification::email::MailNotifier,
+    parser::ConfigKey,
+    task::Task,
     task_info::TaskInfo,
 };
 
@@ -36,26 +40,15 @@ impl Display for ConfigFileError {
     }
 }
 
-type Key = &'static str;
-type AtWhy = &'static str;
-type Service = String;
 #[derive(Debug)]
-pub enum ConfigurationParseError {
-    KeyNotFound(Key, AtWhy),
+pub enum ConfigParseError {
     NoServiceProvided,
-    InvalidServiceMap(Service),
 }
-impl Display for ConfigurationParseError {
+impl Display for ConfigParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConfigurationParseError::KeyNotFound(key, at_why) => {
-                write!(f, "Mandatory key not found: {key} {at_why}")
-            }
-            ConfigurationParseError::NoServiceProvided => {
+            ConfigParseError::NoServiceProvided => {
                 write!(f, "None service provided, aborting.")
-            }
-            ConfigurationParseError::InvalidServiceMap(key) => {
-                write!(f, "A key has a invalid map: {key}")
             }
         }
     }
@@ -111,7 +104,7 @@ fn parse_notifications(yaml: &Yaml, config: &mut Configuration) -> Result<(), St
 
 fn parse_mailer(mailer: &Yaml) -> Result<Option<MailNotifier>, String> {
     if mailer.is_badvalue() {
-        return Ok(None)
+        return Ok(None);
     }
 
     Ok(Some(MailNotifier::try_from(mailer)?))
@@ -122,15 +115,15 @@ fn parse_services(section: &(&Yaml, &Yaml)) -> Result<Vec<Task>, String> {
 
     let services_map = match section.1.as_hash() {
         Some(map) => map,
-        None => return Err(format!("{}", ConfigurationParseError::NoServiceProvided)),
+        None => return Err(format!("{}", ConfigParseError::NoServiceProvided)),
     };
     for service in services_map.iter() {
         let service_name = service.0.as_str().unwrap().to_string();
 
-        let interval =
-            interval(service.1).map_err(|e| format!("{e}\nThrowed when reading service: {service_name}"))?;
-        let checker =
-            get_checker(service.1).map_err(|e| format!("{e}\nThrowed when reading service: {service_name}"))?;
+        let interval = interval(service.1)
+            .map_err(|e| format!("{e}\nThrowed when reading service: {service_name}"))?;
+        let checker = get_checker(service.1)
+            .map_err(|e| format!("{e}\nThrowed when reading service: {service_name}"))?;
         let info = TaskInfo::new(service_name, interval);
 
         tasks.push(Task::new(info, checker));
@@ -146,12 +139,10 @@ fn interval(service_attrs: &Yaml) -> Result<SignedDuration, String> {
         )),
     }
 }
-fn get_checker(service_attrs: &Yaml) -> Result<Checker, String> {
+fn get_checker(service_attrs: &Yaml) -> Result<Checker, CheckerParserError> {
     let service_config = &service_attrs["configuration"];
     if service_config.is_badvalue() {
-        return Err(String::from(
-            "'configuration' is a mandatory map field for a service.",
-        ));
+        return Err(CheckerParserError::KeyNotFound(ConfigKey::Configuration));
     }
 
     Checker::try_from(service_config)

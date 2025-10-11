@@ -6,9 +6,12 @@ use std::{
 
 use yaml_rust2::Yaml;
 
-use crate::checker::{
-    Checker,
-    structs::{CheckerResult, CheckerStatus},
+use crate::{
+    checker::{
+        Checker,
+        structs::{CheckerParserError, CheckerResult, CheckerStatus, CheckerType},
+    },
+    parser::{ConfigKey, keys::ConfigKeyInvalidFormat},
 };
 
 #[derive(Debug, PartialEq, Eq)]
@@ -44,34 +47,43 @@ impl ServerChecker {
 }
 
 impl TryFrom<&Yaml> for ServerChecker {
-    type Error = String;
+    type Error = CheckerParserError;
     fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
         let socket = match &data["socket"] {
             Yaml::String(s) if !s.is_empty() => s,
             _ => {
-                return Err(String::from(
-                    "Key 'socket' is mandatory for service of type server",
+                return Err(CheckerParserError::KeyNotFoundAt(
+                    ConfigKey::Socket,
+                    CheckerType::Server,
                 ));
             }
         };
 
         let socket_split = socket.split_once(':');
         if socket_split.is_none() {
-            return Err(String::from(
-                "Key 'socket' must follow the pattern HOST:PORT",
+            return Err(CheckerParserError::InvalidFormat(
+                ConfigKey::Socket,
+                ConfigKeyInvalidFormat::new(ConfigKey::Socket),
             ));
         }
 
         let addr = socket_split.unwrap().0;
         let socket_addr = if addr.parse::<IpAddr>().is_ok() {
-            SocketAddr::from_str(socket).map_err(|e| format!("Invalid socket: {e}"))?
+            SocketAddr::from_str(socket)
+                .map_err(|e| CheckerParserError::InternalParse(format!("Invalid socket: {e}")))?
         } else {
             let ip_addrs = socket.to_socket_addrs().map_err(|e| {
-                format!("Unable to convert the socket to a Address due to the following error: {e}")
+                CheckerParserError::InternalParse(format!(
+                    "Unable to convert the socket to a Address due to the following error: {e}"
+                ))
             })?;
             match ip_addrs.collect::<Vec<SocketAddr>>().first() {
                 Some(s_addr) => *s_addr,
-                None => return Err("No IP resolution found to the socket".to_string()),
+                None => {
+                    return Err(CheckerParserError::InternalParse(
+                        "No IP resolution found to the socket".to_string(),
+                    ));
+                }
             }
         };
         let timeout = Checker::timeout(data)?;

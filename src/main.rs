@@ -1,7 +1,7 @@
 use std::process::exit;
 
 use clap::Parser;
-use toktok::{args::Args, configuration::load_config, scheduler::Scheduler};
+use toktok::{args::Args, parser::load_config, scheduler::Scheduler};
 use tracing::{Level, event};
 
 #[tokio::main]
@@ -32,5 +32,5 @@ async fn main() {
     }
 
     let scheduler = Scheduler::new(config);
-    scheduler.start(notifiers).await
+    scheduler.init(notifiers).await
 }

@@ -1,24 +1,28 @@
-use std::process::exit;
-
 use clap::Parser;
-use toktok::{args::Args, parser::load_config, scheduler::Scheduler};
+use toktok::{args::Args, parser::Configuration, scheduler::Scheduler};
 use tracing::{Level, event};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), String> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
-    let config = match load_config(&args) {
-        Ok(s) => s,
-        Err(err) => {
-            eprintln!("\x1b[31merror: \x1b[0mIncorrect data found in configuration\n\n{err}");
-            exit(1);
-        }
-    };
-    if config.tasks.is_empty() {
-        println!("None services found to monitor, shutting down");
-        exit(0);
+    let config = Configuration::builder(&args)
+        .map_err(|e| format!("{e}"))?
+        .services()?
+        .mailer()?
+        .build();
+
+    // let config = match load_config(&args) {
+    //     Ok(s) => s,
+    //     Err(err) => {
+    //         eprintln!("\x1b[31merror: \x1b[0mIncorrect data found in configuration\n\n{err}");
+    //         exit(1);
+    //     }
+    // };
+
+    if config.has_tasks() {
+        return Err("None services found to monitor, shutting down".to_string());
     }
 
     event!(
@@ -32,5 +36,7 @@ async fn main() {
     }
 
     let scheduler = Scheduler::new(config);
-    scheduler.init(notifiers).await
+    scheduler.init(notifiers).await;
+
+    Ok(())
 }

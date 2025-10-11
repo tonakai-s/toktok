@@ -1,7 +1,5 @@
 use std::{fmt::Display, str::FromStr};
 
-use crate::parser::{error::ConfigError, keys::ConfigKeyInvalidFormat, ConfigKey};
-
 #[derive(Debug)]
 pub enum CheckerType {
     Web,

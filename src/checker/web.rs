@@ -9,7 +9,7 @@ use yaml_rust2::Yaml;
 use crate::{
     checker::{
         Checker,
-        structs::{CheckerParserError, CheckerResult, CheckerStatus, CheckerType},
+        structs::{CheckerParseError, CheckerResult, CheckerStatus, CheckerType},
     },
     parser::{ConfigKey, keys::ConfigKeyInvalidFormat},
 };
@@ -89,12 +89,12 @@ impl WebChecker {
 }
 
 impl TryFrom<&Yaml> for WebChecker {
-    type Error = CheckerParserError;
+    type Error = CheckerParseError;
     fn try_from(data: &Yaml) -> Result<Self, Self::Error> {
         let url = match &data[ConfigKey::Url.as_ref()] {
             Yaml::String(d) if !d.is_empty() => d,
             _ => {
-                return Err(CheckerParserError::KeyNotFoundAt(
+                return Err(CheckerParseError::KeyNotFoundAt(
                     ConfigKey::Url,
                     CheckerType::Web,
                 ));
@@ -106,14 +106,14 @@ impl TryFrom<&Yaml> for WebChecker {
                 if http_code >= u16::MIN as i64 && http_code <= u16::MAX as i64 =>
             {
                 StatusCode::from_u16(http_code as u16).map_err(|_| {
-                    CheckerParserError::InvalidFormat(
+                    CheckerParseError::InvalidFormat(
                         ConfigKey::ExpectedHttpCode,
                         ConfigKeyInvalidFormat::new(ConfigKey::ExpectedHttpCode),
                     )
                 })?
             }
             _ => {
-                return Err(CheckerParserError::InvalidFormat(
+                return Err(CheckerParseError::InvalidFormat(
                     ConfigKey::ExpectedHttpCode,
                     ConfigKeyInvalidFormat::new(ConfigKey::ExpectedHttpCode),
                 ));

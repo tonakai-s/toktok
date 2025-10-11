@@ -1,7 +1,8 @@
 use std::{fmt::Display, str::FromStr};
 
-use crate::parser::{ConfigKey, keys::ConfigKeyInvalidFormat};
+use crate::parser::{ConfigKey, error::ConfigError, keys::ConfigKeyInvalidFormat};
 
+#[derive(Debug)]
 pub enum CheckerType {
     Web,
     Server,
@@ -65,25 +66,28 @@ impl Display for CheckerResult {
     }
 }
 
-pub enum CheckerParserError {
+#[derive(Debug)]
+pub enum CheckerParseError {
     KeyNotFoundAt(ConfigKey, CheckerType),
     KeyNotFound(ConfigKey),
     InvalidType(String),
     InvalidFormat(ConfigKey, ConfigKeyInvalidFormat),
     InternalParse(String),
 }
-impl Display for CheckerParserError {
+impl Display for CheckerParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CheckerParserError::KeyNotFoundAt(key, c_type) => {
+            CheckerParseError::KeyNotFoundAt(key, c_type) => {
                 write!(f, "Key {key} is mandatory for a service of type {c_type}.")
             }
-            CheckerParserError::KeyNotFound(key) => write!(f, "Key '{key}' is mandatory."),
-            CheckerParserError::InvalidType(t) => write!(f, "Invalid type informed: {t}."),
-            CheckerParserError::InvalidFormat(key, format) => {
+            CheckerParseError::KeyNotFound(key) => write!(f, "Key '{key}' is mandatory."),
+            CheckerParseError::InvalidType(t) => write!(f, "Invalid type informed: {t}."),
+            CheckerParseError::InvalidFormat(key, format) => {
                 write!(f, "Invalid format for '{key}'. Expected: {format}")
             }
-            CheckerParserError::InternalParse(e) => write!(f, "{e}"),
+            CheckerParseError::InternalParse(e) => write!(f, "{e}"),
         }
     }
 }
+
+impl ConfigError for CheckerParseError {}

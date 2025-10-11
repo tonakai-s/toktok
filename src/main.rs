@@ -1,29 +1,32 @@
+use std::process;
+
 use clap::Parser;
-use toktok::{args::Args, parser::Configuration, scheduler::Scheduler};
+use toktok::{
+    args::Args,
+    parser::{Configuration, error::ConfigError},
+    scheduler::Scheduler,
+};
 use tracing::{Level, event};
 
 #[tokio::main]
-async fn main() -> Result<(), String> {
+async fn main() -> Result<(), Box<dyn ConfigError>> {
     tracing_subscriber::fmt::init();
+
+    if let Err(e) = entrypoint().await {
+        eprint!("Error: {}", e);
+        process::exit(1);
+    }
+
+    Ok(())
+}
+
+async fn entrypoint() -> Result<(), Box<dyn ConfigError>> {
     let args = Args::parse();
 
-    let config = Configuration::builder(&args)
-        .map_err(|e| format!("{e}"))?
+    let config = Configuration::builder(&args)?
         .services()?
         .mailer()?
-        .build();
-
-    // let config = match load_config(&args) {
-    //     Ok(s) => s,
-    //     Err(err) => {
-    //         eprintln!("\x1b[31merror: \x1b[0mIncorrect data found in configuration\n\n{err}");
-    //         exit(1);
-    //     }
-    // };
-
-    if config.has_tasks() {
-        return Err("None services found to monitor, shutting down".to_string());
-    }
+        .build()?;
 
     event!(
         Level::INFO,

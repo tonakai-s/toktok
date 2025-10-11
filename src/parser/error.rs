@@ -1,7 +1,14 @@
-use std::{fmt::Display, io};
+use std::{
+    fmt::{Debug, Display},
+    io,
+};
 
-trait Error {}
-pub struct ConfigError<T: Error + Display>(T);
+pub trait ConfigError: Debug + Display {}
+impl<E: ConfigError + 'static> From<E> for Box<dyn ConfigError> {
+    fn from(e: E) -> Self {
+        Box::new(e)
+    }
+}
 
 #[derive(Debug)]
 pub enum ConfigFileError {
@@ -24,6 +31,7 @@ impl Display for ConfigFileError {
         }
     }
 }
+impl ConfigError for ConfigFileError {}
 
 #[derive(Debug)]
 pub enum ConfigParseError {
@@ -38,3 +46,4 @@ impl Display for ConfigParseError {
         }
     }
 }
+impl ConfigError for ConfigParseError {}

@@ -5,13 +5,14 @@ use yaml_rust2::Yaml;
 pub mod server;
 pub mod structs;
 pub mod web;
+pub mod error;
 
 pub use server::ServerChecker;
 pub use web::WebChecker;
 
 use crate::{
-    checker::structs::{CheckerParseError, CheckerType},
-    parser::{ConfigKey, keys::ConfigKeyInvalidFormat},
+    checker::{error::CheckerParseError, structs::CheckerType},
+    parser::{keys::ConfigKeyInvalidFormat, ConfigKey},
 };
 
 #[derive(Debug)]

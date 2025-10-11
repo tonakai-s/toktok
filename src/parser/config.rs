@@ -5,11 +5,10 @@ use yaml_rust2::{Yaml, YamlLoader};
 
 use crate::{
     args::Args,
-    checker::{Checker, structs::CheckerParseError},
+    checker::{error::CheckerParseError, Checker},
     notification::{email::MailNotifier, error::NotificationParseError},
     parser::{
-        ConfigKey,
-        error::{ConfigFileError, ConfigParseError},
+        error::{ConfigFileError, ConfigParseError}, ConfigKey
     },
     task::Task,
     task_info::TaskInfo,

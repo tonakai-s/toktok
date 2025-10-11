@@ -8,10 +8,9 @@ use yaml_rust2::Yaml;
 
 use crate::{
     checker::{
-        Checker,
-        structs::{CheckerParseError, CheckerResult, CheckerStatus, CheckerType},
+        error::CheckerParseError, structs::{CheckerResult, CheckerStatus, CheckerType}, Checker
     },
-    parser::{ConfigKey, keys::ConfigKeyInvalidFormat},
+    parser::{keys::ConfigKeyInvalidFormat, ConfigKey},
 };
 
 #[derive(Debug, PartialEq, Eq)]

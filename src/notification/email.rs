@@ -296,7 +296,12 @@ impl TryFrom<&Yaml> for MailNotifier {
                 )
             }
             Yaml::BadValue => None,
-            _ => return Err(NotificationParseError::InternalParse(format!("Key '{}' must have a YAML Array format", ConfigKey::MailCc))),
+            _ => {
+                return Err(NotificationParseError::InternalParse(format!(
+                    "Key '{}' must have a YAML Array format",
+                    ConfigKey::MailCc
+                )));
+            }
         };
         if let Some(cc) = cc {
             mail_builder = mail_builder.cc(cc)?;
@@ -312,9 +317,14 @@ impl TryFrom<&Yaml> for MailNotifier {
                         .map(|addr| addr.as_str().unwrap().trim().to_string())
                         .collect(),
                 )
-            },
+            }
             Yaml::BadValue => None,
-            _ => return Err(NotificationParseError::InternalParse(format!("Key '{}' must have a YAML Array format", ConfigKey::MailBcc))),
+            _ => {
+                return Err(NotificationParseError::InternalParse(format!(
+                    "Key '{}' must have a YAML Array format",
+                    ConfigKey::MailBcc
+                )));
+            }
         };
         if let Some(bcc) = bcc {
             mail_builder = mail_builder.bcc(bcc)?;

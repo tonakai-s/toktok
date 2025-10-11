@@ -13,7 +13,7 @@ async fn main() -> Result<(), Box<dyn ConfigError>> {
     tracing_subscriber::fmt::init();
 
     if let Err(e) = entrypoint().await {
-        eprint!("Error: {}", e);
+        eprint!("Error: {e}");
         process::exit(1);
     }
 

@@ -1,20 +1,20 @@
 services:
   site.tuamaeaquelaursa5secs:
-    interval: 5
-    timeout: 10
+    interval: 5 # All service need to have a interval
     configuration:
       type: web
       url: 'https://tuamaeaquelaursa.com'
       expected_http_code: 200
+      timeout: 10
   site.tuamaeaquelaursa10secs:
     interval: 10
-    timeout: 10
     configuration:
       type: web
       url: 'https://tuamaeaquelaursa.com'
-      expected_http_code: 200
-      headers:
+      expected_http_code: 201
+      headers: # The most common headers are suported, like Authorization, ApiKey and more.
         Content-type: 'application/json'
+        timeout: 30
   api.auth.apikey:
     interval: 10
     timeout: 10
@@ -24,13 +24,13 @@ services:
       headers:
         ApiKey: 'foobarbaz'
       expected_http_code: 200
-  server.internal.tcp.addr:
+  server.internal.tcp.addr: # You define a server with his IP Address
     interval: 10
     configuration:
       type: server
       socket: 127.0.0.1:22
       timeout: 10
-  server.internal.tcp.dns:
+  server.internal.tcp.dns: # Or with a DNS name to resolution
     interval: 10
     configuration:
       type: server
@@ -39,7 +39,11 @@ services:
 
 notification:
   mailer:
-    smtp_credentials: mail.creds.example
+    smtp_credentials: mail.creds.example # File for credentials
     smtp_domain: your.smtp.server.domain.com
-    from: from@gmail.com
-    to: to@gmail.com
+    from: from@mail.com
+    to: to@mail.com
+    cc: # Must be an array
+      - somemail@mail.com
+    bcc: # Must be an array
+      - somemail@mail.com

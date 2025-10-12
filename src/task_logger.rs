@@ -11,7 +11,7 @@ use crate::checker::structs::CheckerResult;
 
 #[derive(Debug)]
 pub struct TaskLogger {
-    filename: String,
+    task_name: String,
     file_dir: PathBuf,
     file_date: Date,
     file: File,
@@ -45,7 +45,7 @@ impl TaskLogger {
             .map_err(|e| format!("The program was unable to open the logs file. Error: {e}"))?;
 
         Ok(Self {
-            filename,
+            task_name: task_name.to_string(),
             file_dir: log_path,
             file_date: Zoned::now().date(),
             file,
@@ -104,7 +104,7 @@ impl TaskLogger {
         let full_log_filepath = format!(
             "{}/{}",
             self.file_dir.to_str().unwrap(),
-            TaskLogger::todays_filename(&self.filename)
+            TaskLogger::todays_filename(&self.task_name)
         );
         let full_log_filepath = Path::new(&full_log_filepath);
         if !full_log_filepath.exists()

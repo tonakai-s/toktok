@@ -9,6 +9,7 @@ use tracing::{Level, event, span};
 
 use crate::checker::structs::CheckerResult;
 
+/// This struct holds data to generate logs for all executions of a specific thread.
 #[derive(Debug)]
 pub struct TaskLogger {
     task_name: String,
@@ -74,6 +75,7 @@ impl TaskLogger {
         )
     }
 
+    /// Each call validate if the current date is the same of the current file, if not it generates a new one.
     pub fn log(&mut self, execution_result: &CheckerResult) {
         let span = span!(Level::TRACE, "task_logger::log");
         let _enter = span.enter();

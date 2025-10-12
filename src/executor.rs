@@ -10,6 +10,9 @@ use crate::{
     task::Task,
 };
 
+/// This function calls the checker of the received function.
+/// Validate the result, if necessary send the result to the notifier thread.
+/// Finally it sents the task back to the enqueuer thread.
 pub async fn execute_check(
     mut task: Task,
     tx_task: Sender<Task>,

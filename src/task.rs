@@ -6,6 +6,7 @@ use crate::{
     task_logger::TaskLogger,
 };
 
+/// The base struct for a task.
 #[derive(Debug)]
 pub struct Task {
     info: TaskInfo,

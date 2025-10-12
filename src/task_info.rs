@@ -1,5 +1,7 @@
 use jiff::{SignedDuration, Zoned, civil::DateTime};
 
+/// The informations about a task.
+/// The `name` is defined by the key of the service in the yaml config file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskInfo {
     pub name: String,
@@ -17,10 +19,4 @@ impl TaskInfo {
             next_execution_at: Zoned::now().datetime(),
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum TaskState {
-    Waiting,
-    Running,
 }

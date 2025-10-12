@@ -1,7 +1,5 @@
 use std::{
-    sync::{Arc, Mutex, mpsc::channel},
-    thread,
-    time::Duration,
+    sync::{Arc, Mutex, mpsc::channel}
 };
 
 use jiff::Zoned;
@@ -17,8 +15,6 @@ pub struct Scheduler {
     tasks: Arc<Mutex<PriorityQueue>>,
 }
 
-pub struct SchedulerBuilder {}
-
 impl Scheduler {
     pub fn new(config: Configuration) -> Self {
         let queue = Arc::new(Mutex::new(PriorityQueue::default()));
@@ -32,6 +28,11 @@ impl Scheduler {
         Self { tasks: queue }
     }
 
+    /// This method starts 2 threads and start the tasks checker loop.
+    /// First thread will update a task with the calculated next execution time, and enqueue it.
+    /// The second thread is supposed to receive a `CheckerResult` and calls all notifiers to send notifications.
+    /// The tasks loop will check the queue in each iteration searching for tasks which the time of execution reached or passed.
+    /// And the loop spawn a specific thread to the executor validate the service.
     pub async fn init(&self, notifiers: Vec<impl Notifier + Send + 'static>) {
         event!(
             Level::INFO,
@@ -66,7 +67,6 @@ impl Scheduler {
 
         event!(Level::INFO, "Initiating the main task loop");
         loop {
-            thread::sleep(Duration::from_secs(1));
             {
                 let mut task_queue = self.tasks.lock().unwrap();
                 loop {

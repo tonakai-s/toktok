@@ -16,18 +16,23 @@ use crate::{
 
 const DEFAULT_CONFIG_FILE: &str = "toktok.yaml";
 
+/// The general struct for the config file after all validations.
+/// Each new notification method is added as a field
 #[derive(Default)]
 pub struct Configuration {
     pub tasks: Vec<Task>,
     pub mailer: Option<MailNotifier>,
 }
 
+/// Responsible by the build proccess while reading the config file.
 pub struct ConfigurationBuilder {
     config: Vec<Yaml>,
     tasks: Vec<Task>,
     mailer: Option<MailNotifier>,
 }
 impl ConfigurationBuilder {
+    /// Create the base builder, this point also already read the config file,
+    /// from the custom path by argument or the default filename in the same folder of the binary.
     fn try_new(args: &Args) -> Result<Self, ConfigFileError> {
         Ok(Self {
             config: ConfigurationBuilder::load_config(args.config.as_deref())?,
@@ -48,6 +53,7 @@ impl ConfigurationBuilder {
         YamlLoader::load_from_str(&content).map_err(ConfigFileError::UnableToScan)
     }
 
+    /// Read all services inside the key `services` and parse each of them into a `Task`
     pub fn services(mut self) -> Result<Self, CheckerParseError> {
         let mut tasks = vec![];
 
@@ -91,6 +97,7 @@ impl ConfigurationBuilder {
         }
     }
 
+    /// Parse the specific `notification->mailer` map into the config file.
     pub fn mailer(mut self) -> Result<Self, NotificationParseError> {
         let mailer_section = &self.config[0]["notification"]["mailer"];
         if !mailer_section.is_hash() {
@@ -101,6 +108,7 @@ impl ConfigurationBuilder {
         Ok(self)
     }
 
+    /// Generate a `Configuration` struct after all validations passed.
     pub fn build(self) -> Result<Configuration, ConfigParseError> {
         if self.tasks.is_empty() {
             return Err(ConfigParseError::NoServiceProvided);

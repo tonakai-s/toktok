@@ -2,6 +2,11 @@
 name = "toktok"
 version = "0.1.0"
 edition = "2024"
+description = "An easy and simple monitor tool"
+readme = "README.md"
+repository = "https://github.com/tonakai-s/toktok"
+license = "MIT AND UNLICENCE"
+keywords = ["monitor", "tool"]
 
 [dependencies]
 clap = { version = "4.5.48", features = ["derive"] }
